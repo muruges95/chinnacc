@@ -25,7 +25,8 @@ assert 0 0
 assert 42 42
 assert 21 '5+20-4'
 assert 29 '28-2+3'
+assert 29 ' 28 - 1 - 1 +  3 '
 
-echo "Tests passed: $test_passed / 4" '\n'
+echo "Tests passed: $test_passed/5"
 
 echo OK
