@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <ctype.h> // contains util functions for testing and mapping chars (such as if they are alpha num)
 #include <stdarg.h> // allows one to make use of functions with a variable number of arguments using va_x functons and macros
 #include <stdbool.h> // allows one to use true and false in place of 0 and 1
@@ -5,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Tokenizer
 /* DEFINITIONS */
 
 typedef enum {
@@ -116,7 +118,8 @@ static Token *tokenize(void) {
 			continue;
 		}
 		
-		if (*p == '+' || *p == '-') {
+		// Punctuation
+		if (ispunct(*p)){
 			curr = curr->next = new_token(TK_PUNCT, p, p+1);
 			p++;
 			continue;
@@ -127,6 +130,52 @@ static Token *tokenize(void) {
 	curr = curr->next = new_token(TK_EOF, p, p);
     return head.next;
 }
+// Parser
+
+/* DEFINITIONS */
+
+typedef enum {
+	ND_ADD,
+	ND_SUB,
+	ND_MUL,
+	ND_DIV,
+	ND_NUM // Integer
+} NodeKind;
+
+// AST node type
+typedef struct Node Node;
+struct Node {
+	NodeKind kind;	// type of node
+	Node *lhs;		// left child of node
+	Node *rhs;		// right child of node
+	int val;		// for num nodes
+};
+
+static Node *new_node(NodeKind kind) {
+	Node *node = calloc(1, sizeof(Node));
+	node->kind = kind;
+	return node;
+}
+
+static Node *new_binary_node(NodeKind kind, Node *lhs, Node *rhs) {
+	Node *node = new_node(kind);
+	node->lhs = lhs;
+	node->rhs = rhs;
+	return node;
+}
+
+static Node *new_numeric_node(int val) {
+	Node *node = new_node(ND_NUM);
+	node->val = val;
+	return node;
+}
+
+// TODO: Implement these three functions
+// This will be delving into actuating the translation scheme
+// Need to write it down before adopting it
+static Node *expr(Token *tok, Token **rest);
+static Node *mul(Token *tok, Token **rest);
+static Node *primary(Token *tok, Token **rest);
 
 int main(int argc, char **argv) {
 	if (argc != 2){
