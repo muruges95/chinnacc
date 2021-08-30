@@ -173,9 +173,122 @@ static Node *new_numeric_node(int val) {
 // TODO: Implement these three functions
 // This will be delving into actuating the translation scheme
 // Need to write it down before adopting it
+// Currently the rest that is being passed down not being used, likely for 
+// debugging purposes in future commits
 static Node *expr(Token *tok, Token **rest);
 static Node *mul(Token *tok, Token **rest);
 static Node *primary(Token *tok, Token **rest);
+
+// primary: the units that are unbreakable, start with this,
+// will also include the non-terminal involved in the lowest precedence ops
+// Translation scheme: primary -> digit | "(" expr ")"
+static Node *primary(Token *tok, Token **rest) {
+	if (tok->kind == TK_NUM) {
+		Node *node = new_numeric_node(tok->val);
+		*rest = tok->next;
+		return node;
+	}
+
+	if (equal(tok, "(")) {
+		Node *node = expr(tok->next, &tok);
+		*rest = skip(tok, ")");
+		return node;
+	}
+
+	error_tok(tok, "expected either a number or `(`");
+}
+
+// expr: in this case the translation scheme targeting the operators with the 
+// lowest precedence, will loop back here from the unbreakable (highest preced
+// level) in case there is more to unpack. Its also the entry point non term.
+// Translation scheme: expr -> mul | expr "+" mul | expr "-" mul
+// With regex (as per chibicc): expr -> mul ("+" mul | "-" mul)* (using this)
+
+static Node *expr(Token *tok, Token **rest) {
+	Node *node = mul(tok, &tok);
+
+	for (;;) {
+		if (equal(tok, "+")) {
+			node = new_binary_node(ND_ADD, node, mul(tok->next, &tok));
+			continue;
+		}
+		if (equal(tok, "-")) {
+			node = new_binary_node(ND_SUB, node, mul(tok->next, &tok));
+			continue;
+		}
+		*rest = tok;
+		return node; // if reached, exit the loop
+	}
+}
+
+// mul, the next precedence level. notice how the prev one always has at least
+// one non-terminal translation involving the next highest (inc some terminals)
+// Translation scheme: mul -> primary | mul "*" primary | mul "/" primary
+// With regex (as per chibicc): mul-> primary ("*" primary | "/" primary)*
+
+static Node *mul(Token *tok, Token **rest) {
+	Node *node = primary(tok, &tok);
+
+	for (;;) {
+		if (equal(tok, "*")) {
+			node = new_binary_node(ND_MUL, node, primary(tok->next, &tok));
+			continue;
+		}
+		if (equal(tok, "/")) {
+			node = new_binary_node(ND_DIV, node, primary(tok->next, &tok));
+			continue;
+		}
+
+		*rest = tok;
+		return node; // if reached, exit the loop
+	}
+}
+
+// Codegen
+
+static int depth; // stack depth
+
+static void push(void) {
+	printf("  push %%rax\n");
+	depth++;
+}
+
+static void pop(char *arg) {
+	printf("  pop %s\n", arg);
+	depth--;
+}
+
+static void gen_expr(Node *node) {
+	if (node->kind == ND_NUM) {
+		printf("  mov $%d, %%rax\n", node->val);
+		return;
+	}
+	// all other node types are binary
+	gen_expr(node->rhs); // load rhs val into rax reg
+	push(); // push rax reg val into stack
+	gen_expr(node->lhs); // load lhs val into rax reg
+	pop("%rdi");	// pop rhs val into rdi register
+					// swapping with the line above fails as rdi val could be
+					// overwritten as we codegen for child nodes
+
+	switch (node->kind) {
+		case ND_ADD:
+			printf("  add %%rdi, %%rax\n"); // dest is rax
+			return;
+		case ND_SUB:
+			printf("  sub %%rdi, %%rax\n"); // sub source (rdi) from dest (rax)
+			return;
+		case ND_MUL:
+			printf("  imul %%rdi, %%rax\n"); // dest is rax
+			return;
+		case ND_DIV:
+			printf("  cqo\n"); // converts quadword in rax to octoword rdx:rax
+			printf("  idiv %%rdi\n"); // signed divide the octoword by rdi
+			return;
+	}
+
+	error("invalid expression");
+}
 
 int main(int argc, char **argv) {
 	if (argc != 2){
@@ -183,28 +296,28 @@ int main(int argc, char **argv) {
 	}
 
 	current_input = argv[1];
-	Token *token = tokenize();
+	Token *tok = tokenize();
 	
 	// first token must be a number
-	if (token->kind != TK_NUM) {
-		error_at(current_input, "%s: First non-whitespace token must be a number", argv[0]);
+	// if (tok->kind != TK_NUM) {
+		// error_at(current_input, "%s: First non-whitespace token must be a number", argv[0]);
+	// }
+
+	Node *node = expr(tok, &tok);
+
+	// if not all tokens consumed when generating parse tree
+	if (tok->kind != TK_EOF) {
+		error_tok(tok, "extra token not parsed");
 	}
 
 	printf("  .globl main\n");
 	printf("main:\n");
-	printf("  mov $%d, %%rax\n", get_number(token));
-	token = token->next;
 
-	// sequence must now be op, num, op, num, ...
-	// in regex: [`op``num`]*
-	while (token->kind != TK_EOF) {
-		if (equal(token, "+")) {
-			printf("  add $%d, %%rax\n", get_number(token->next));
-		} else {
-			printf("  sub $%d, %%rax\n", get_number(token->next));
-		}
-		token = token->next->next;
-	}
+	// codegen as we walk down parse tree
+	gen_expr(node);
+
 	printf("  ret\n");
+
+	assert(depth == 0);
 	return 0;
 }
