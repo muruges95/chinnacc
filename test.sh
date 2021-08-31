@@ -29,7 +29,10 @@ assert 29 ' 28 - 1 - 1 +  3 '
 assert 47 '5+6*7'
 assert 15 '5*(9-6)'
 assert 4 '(3+5)/2'
+assert 13 '-10+23 '
+assert 15 '--+25-10'
+assert 16 '26---10'
 
-echo "Tests passed: $test_passed/8"
+echo "Tests passed: $test_passed/11"
 
 echo OK

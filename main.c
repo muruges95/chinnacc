@@ -135,11 +135,12 @@ static Token *tokenize(void) {
 /* DEFINITIONS */
 
 typedef enum {
-	ND_ADD,
-	ND_SUB,
-	ND_MUL,
-	ND_DIV,
-	ND_NUM // Integer
+	ND_ADD,	// +
+	ND_SUB,	// -
+	ND_MUL,	// *
+	ND_DIV,	// /
+	ND_NEG,	// unary negate
+	ND_NUM	// Integer
 } NodeKind;
 
 // AST node type
@@ -154,6 +155,14 @@ struct Node {
 static Node *new_node(NodeKind kind) {
 	Node *node = calloc(1, sizeof(Node));
 	node->kind = kind;
+	return node;
+}
+
+// We include the nodekind here to allow for other unary ops in the future
+// such as increment and decrement
+static Node *new_unary_node(NodeKind kind, Node *expr) {
+	Node *node = new_node(kind);
+	node->lhs = expr;
 	return node;
 }
 
@@ -177,6 +186,7 @@ static Node *new_numeric_node(int val) {
 // debugging purposes in future commits
 static Node *expr(Token *tok, Token **rest);
 static Node *mul(Token *tok, Token **rest);
+static Node *unary(Token *tok, Token **rest);
 static Node *primary(Token *tok, Token **rest);
 
 // primary: the units that are unbreakable, start with this,
@@ -223,25 +233,41 @@ static Node *expr(Token *tok, Token **rest) {
 
 // mul, the next precedence level. notice how the prev one always has at least
 // one non-terminal translation involving the next highest (inc some terminals)
-// Translation scheme: mul -> primary | mul "*" primary | mul "/" primary
-// With regex (as per chibicc): mul-> primary ("*" primary | "/" primary)*
+// Translation scheme: mul -> unary | mul "*" unary | mul "/" unary
+// With regex (as per chibicc): mul -> unary ("*" unary | "/" unary)*
 
 static Node *mul(Token *tok, Token **rest) {
-	Node *node = primary(tok, &tok);
+	Node *node = unary(tok, &tok);
 
 	for (;;) {
 		if (equal(tok, "*")) {
-			node = new_binary_node(ND_MUL, node, primary(tok->next, &tok));
+			node = new_binary_node(ND_MUL, node, unary(tok->next, &tok));
 			continue;
 		}
 		if (equal(tok, "/")) {
-			node = new_binary_node(ND_DIV, node, primary(tok->next, &tok));
+			node = new_binary_node(ND_DIV, node, unary(tok->next, &tok));
 			continue;
 		}
 
 		*rest = tok;
 		return node; // if reached, exit the loop
 	}
+}
+
+// unary, next precedence level
+// Translation scheme: unary -> primary | "+" unary | "-" unary
+// In this case the handling is slightly diff for all 3 cases
+
+static Node *unary(Token *tok, Token **rest) {
+	// ignore + unary
+	if (equal(tok, "+")) {
+		return unary(tok->next, rest);
+	}
+	if (equal(tok, "-")) {
+		return new_unary_node(ND_NEG, unary(tok->next, rest));
+	}
+
+	return primary(tok, rest);
 }
 
 // Codegen
@@ -259,10 +285,16 @@ static void pop(char *arg) {
 }
 
 static void gen_expr(Node *node) {
-	if (node->kind == ND_NUM) {
-		printf("  mov $%d, %%rax\n", node->val);
-		return;
+	switch (node->kind) {
+		case ND_NUM:
+			printf("  mov $%d, %%rax\n", node->val);
+			return;
+		case ND_NEG:
+			gen_expr(node->lhs);
+			printf("  neg %%rax\n");
+			return;
 	}
+
 	// all other node types are binary
 	gen_expr(node->rhs); // load rhs val into rax reg
 	push(); // push rax reg val into stack
