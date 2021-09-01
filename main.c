@@ -95,6 +95,21 @@ static Token *new_token(TokenKind kind, char *start, char *end) {
 	return tok;
 }
 
+// compares the leading chars with some short string q
+static bool startswith(char *p, char *q) {
+	return strncmp(p, q, strlen(q)) == 0;
+}
+
+// returns the length of the punct to consume
+// if one of the equality operators returns 2, otherwise 1 if a punct
+static int read_punct(char *p) {
+	if (startswith(p, "==") || startswith(p, "!=") ||
+				startswith(p, "<=") || startswith(p, ">=")) {
+		return 2;
+	}
+
+	return ispunct(*p) ? 1 : 0;
+}
 // Tokenize the char "current_input" and returns the new tokens
 static Token *tokenize(void) {
 	char *p = current_input;
@@ -119,9 +134,10 @@ static Token *tokenize(void) {
 		}
 		
 		// Punctuation
-		if (ispunct(*p)){
-			curr = curr->next = new_token(TK_PUNCT, p, p+1);
-			p++;
+		int punct_len = read_punct(p);
+		if (punct_len) {
+			curr = curr->next = new_token(TK_PUNCT, p, p+punct_len);
+			p += punct_len;
 			continue;
 		}
 		error_at(p, "invalid token");
@@ -140,6 +156,10 @@ typedef enum {
 	ND_MUL,	// *
 	ND_DIV,	// /
 	ND_NEG,	// unary negate
+	ND_EQ,	// ==
+	ND_NE,	// !=
+	ND_LT,	// <
+	ND_LTE,	// <=
 	ND_NUM	// Integer
 } NodeKind;
 
@@ -185,6 +205,9 @@ static Node *new_numeric_node(int val) {
 // Currently the rest that is being passed down not being used, likely for 
 // debugging purposes in future commits
 static Node *expr(Token *tok, Token **rest);
+static Node *equality(Token *tok, Token **rest);
+static Node *relational(Token *tok, Token **rest);
+static Node *add(Token *tok, Token **rest);
 static Node *mul(Token *tok, Token **rest);
 static Node *unary(Token *tok, Token **rest);
 static Node *primary(Token *tok, Token **rest);
@@ -208,13 +231,62 @@ static Node *primary(Token *tok, Token **rest) {
 	error_tok(tok, "expected either a number or `(`");
 }
 
-// expr: in this case the translation scheme targeting the operators with the 
+// sink directly into lowest priority level
+static Node *expr(Token *tok, Token **rest) {
+	return equality(tok, rest);
+}
+
+// equality: in this case the translation scheme targeting the operators with the 
 // lowest precedence, will loop back here from the unbreakable (highest preced
 // level) in case there is more to unpack. Its also the entry point non term.
-// Translation scheme: expr -> mul | expr "+" mul | expr "-" mul
-// With regex (as per chibicc): expr -> mul ("+" mul | "-" mul)* (using this)
+// follow doc for add on translation scheme, current lowest precedence level
+static Node *equality(Token *tok, Token **rest) {
+	Node *node = relational(tok, &tok);
+	
+	for (;;) {
+		if (equal(tok, "==")) {
+			node = new_binary_node(ND_EQ, node, relational(tok->next, &tok));
+			continue;
+		}
+		if (equal(tok, "!=")) {
+			node = new_binary_node(ND_NE, node, relational(tok->next, &tok));
+			continue;
+		}
+		*rest = tok;
+		return node;
+	}
+}
 
-static Node *expr(Token *tok, Token **rest) {
+// follow doc for expr. Higher precedence that equality operators
+static Node *relational(Token *tok, Token **rest) {
+	Node *node = add(tok, &tok);
+
+	for (;;) {
+		if (equal(tok, "<")) {
+			node = new_binary_node(ND_LT, node, add(tok->next, &tok));
+			continue;
+		}
+		if (equal(tok, ">")) {
+			node = new_binary_node(ND_LT, add(tok->next, &tok), node);
+			continue;
+		}
+		if (equal(tok, "<=")) {
+			node = new_binary_node(ND_LTE, node, add(tok->next, &tok));
+			continue;
+		}
+		if (equal(tok, ">=")) {
+			node = new_binary_node(ND_LTE, add(tok->next, &tok), node);
+			continue;
+		}
+		*rest = tok;
+		return node;
+	}
+}
+
+// Translation scheme: add -> mul | add "+" mul | add "-" mul
+// With regex (as per chibicc): add -> mul ("+" mul | "-" mul)* (using this)
+
+static Node *add(Token *tok, Token **rest) {
 	Node *node = mul(tok, &tok);
 
 	for (;;) {
@@ -301,7 +373,7 @@ static void gen_expr(Node *node) {
 	gen_expr(node->lhs); // load lhs val into rax reg
 	pop("%rdi");	// pop rhs val into rdi register
 					// swapping with the line above fails as rdi val could be
-					// overwritten as we codegen for child nodes
+					// overwritten as we codegen for child
 
 	switch (node->kind) {
 		case ND_ADD:
@@ -316,6 +388,23 @@ static void gen_expr(Node *node) {
 		case ND_DIV:
 			printf("  cqo\n"); // converts quadword in rax to octoword rdx:rax
 			printf("  idiv %%rdi\n"); // signed divide the octoword by rdi
+			return;
+		case ND_EQ:
+		case ND_NE:
+		case ND_LT:
+		case ND_LTE:
+			printf("  cmp %%rdi, %%rax\n"); // sets flag code based on  $rax - $rdi (essentially cmp op2 op1 does comparison of op1 and op2 in that order)
+			// $al is the least signficant byte of the ax register, set val accordingly
+			if (node->kind == ND_EQ)
+				printf("  sete %%al\n");
+			else if (node->kind == ND_NE)
+				printf("  setne %%al\n");
+			else if (node->kind == ND_LT)
+				printf("  setl %%al\n"); // sets al to 1 if rax > rdi
+			else
+				printf("  setle %%al\n"); // sets al to 1 if rax >= rdi
+
+			printf("  movzb %%al, %%rax\n");	
 			return;
 	}
 
