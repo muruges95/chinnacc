@@ -1,8 +1,12 @@
 CC=gcc
 CFLAGS=-std=c11 -g -fno-common
+SRCS=$(wildcard *.c)
+OBJS=$(SRCS:.c=.o)
 
-chinnacc: main.o
-	$(CC) -o chinnacc main.o $(LDFLAGS)
+chinnacc: $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(OBJS): chinnacc.h
 
 test: chinnacc
 	./test.sh
