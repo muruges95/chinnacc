@@ -28,22 +28,26 @@ Token *tokenize(char *p);
 
 /** PARSE **/
 typedef enum {
-	ND_ADD,	// +
-	ND_SUB,	// -
-	ND_MUL,	// *
-	ND_DIV,	// /
-	ND_NEG,	// unary negate
-	ND_EQ,	// ==
-	ND_NE,	// !=
-	ND_LT,	// <
-	ND_LTE,	// <=
-	ND_NUM	// Integer
+	ND_ADD,			// +
+	ND_SUB,			// -
+	ND_MUL,			// *
+	ND_DIV,			// /
+	ND_NEG,			// unary negate
+	ND_EQ,			// ==
+	ND_NE,			// !=
+	ND_LT,			// <
+	ND_LTE,			// <=
+	ND_NUM,			// Integer
+	ND_EXPR_STMT	// Expression statement
 } NodeKind;
 
 // AST node type
 typedef struct Node Node;
+
+// node data stuct is a mix of a tree and a linked list struct
 struct Node {
 	NodeKind kind;	// type of node
+	Node *next;		// for storing next node in a sequence of statements (block)
 	Node *lhs;		// left child of node
 	Node *rhs;		// right child of node
 	int val;		// for num nodes

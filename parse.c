@@ -31,6 +31,7 @@ static Node *new_numeric_node(int val) {
 // Need to write it down before adopting it
 // Currently the rest that is being passed down not being used, likely for 
 // debugging purposes in future commits
+// EXPRESSIONS
 static Node *expr(Token *tok, Token **rest);
 static Node *equality(Token *tok, Token **rest);
 static Node *relational(Token *tok, Token **rest);
@@ -38,6 +39,10 @@ static Node *add(Token *tok, Token **rest);
 static Node *mul(Token *tok, Token **rest);
 static Node *unary(Token *tok, Token **rest);
 static Node *primary(Token *tok, Token **rest);
+
+// STATEMENTS
+static Node *stmt(Token *tok, Token **rest);
+static Node *expr_stmt(Token *tok, Token **rest);
 
 // primary: the units that are unbreakable, start with this,
 // will also include the non-terminal involved in the lowest precedence ops
@@ -169,11 +174,26 @@ static Node *unary(Token *tok, Token **rest) {
 	return primary(tok, rest);
 }
 
-Node *parse(Token *tok) {
-	Node *node = expr(tok, &tok);
-	// if not all tokens consumed when generating parse tree
-	if (tok->kind != TK_EOF) {
-		error_tok(tok, "extra token not parsed");
-	}
+// stmt -> expr-stmt (more to come as we implmnt them)
+static Node *stmt(Token *tok, Token **rest) {
+	return expr_stmt(tok, rest);
+}
+
+// expr-stmt -> expr ";"
+static Node *expr_stmt(Token *tok, Token **rest) {
+	Node *node = new_unary_node(ND_EXPR_STMT, expr(tok, &tok));
+	*rest = skip(tok, ";");
 	return node;
+}
+
+// top level parsing translation scheme, equivalent to the following
+// program = stmt*
+Node *parse(Token *tok) {
+	Node head = {};
+	Node *cur = &head;
+	while (tok->kind != TK_EOF) {
+		cur = cur->next = stmt(tok, &tok);
+	}
+
+	return head.next;
 }
