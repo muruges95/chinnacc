@@ -90,11 +90,19 @@ Token *tokenize(char *p) {
 
 		// Numeric literal
 		if (isdigit(*p)) {
+			// we dont advance the p to the end here as that is being done by strtoul
 			curr = curr->next = new_token(TK_NUM, p, p);
 			char *q = p;
 			curr->val = strtoul(p, &p, 10); // max we can read in is 1 ul worth of digits, also cant read in hexa or octa digits
 			// strtoul also advances pointer p to after the number ends
 			curr->len = p - q;
+			continue;
+		}
+
+		// identifier (currently accepts 'a' to 'z' only, lowercase)
+		if ('a' <= *p && *p <= 'z') {
+			curr = curr->next = new_token(TK_IDENT, p, p+1);
+			p++;
 			continue;
 		}
 		

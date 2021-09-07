@@ -10,6 +10,7 @@
 
 typedef enum {
 	TK_PUNCT,	// Punctuators
+	TK_IDENT,	// Identifiers
 	TK_NUM,		// Numeric literals
 	TK_EOF,		// End of file markers
 } TokenKind;
@@ -28,17 +29,19 @@ Token *tokenize(char *p);
 
 /** PARSE **/
 typedef enum {
-	ND_ADD,			// +
-	ND_SUB,			// -
-	ND_MUL,			// *
-	ND_DIV,			// /
-	ND_NEG,			// unary negate
-	ND_EQ,			// ==
-	ND_NE,			// !=
-	ND_LT,			// <
-	ND_LTE,			// <=
 	ND_NUM,			// Integer
-	ND_EXPR_STMT	// Expression statement
+	ND_VAR,			// Variable
+	ND_NEG,			// -expr
+	ND_ADD,			// expr1 + expr2
+	ND_SUB,			// expr1 - expr2
+	ND_MUL,			// expr1 * expr2
+	ND_DIV,			// expr1 / expr2
+	ND_ASSIGN,		// expr1 = expr2
+	ND_EQ,			// expr == expr2
+	ND_NE,			// expr1 != expr2
+	ND_LT,			// expr1 < expr2
+	ND_LTE,			// expr1 <= expr2
+	ND_EXPR_STMT	// expr;
 } NodeKind;
 
 // AST node type
@@ -50,7 +53,8 @@ struct Node {
 	Node *next;		// for storing next node in a sequence of statements (block)
 	Node *lhs;		// left child of node
 	Node *rhs;		// right child of node
-	int val;		// for num nodes
+	int val;		// used if kind == ND_NUM
+	char name;		// used if kind == ND_VAR
 };
 
 Node *parse(Token *tok);

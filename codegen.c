@@ -12,6 +12,24 @@ static void pop(char *arg) {
 	depth--;
 }
 
+static const int VAR_STACK_SPACE = ('z' - 'a' + 1) * 8;
+
+// compute the absolute address of a given node and loads it into %rax
+// Gives an error if a given node does not reside in memory (i.e. not an lval)
+static void gen_addr_and_load(Node *node) {
+	// Note: Our variable system is currently configured to store 8 byte values
+	// or 64 bits (like a long). We set aside 8 bytes for each of the 26 possible
+	// 1 char variables at fixed positions. (See below for pos of var and offset)
+	if (node->kind == ND_VAR) {
+		int offset = (node->name - 'a' + 1) * 8;
+		printf("  lea %d(%%rbp), %%rax\n", -offset);
+		return;
+	}
+
+	error("Node is not an lvalue.");
+}
+
+// Gen code for an expression node
 static void gen_expr(Node *node) {
 	switch (node->kind) {
 		case ND_NUM:
@@ -20,6 +38,18 @@ static void gen_expr(Node *node) {
 		case ND_NEG:
 			gen_expr(node->lhs);
 			printf("  neg %%rax\n");
+			return;
+		case ND_VAR:
+			gen_addr_and_load(node);
+			// deref addr in rax and store val back in rax
+			printf("  mov (%%rax), %%rax\n");
+			return;
+		case ND_ASSIGN:
+			gen_addr_and_load(node->lhs);
+			push(); // push var addr into stack
+			gen_expr(node->rhs);
+			pop("%rdi"); // pop var address into rdi
+			printf("  mov %%rax, (%%rdi)\n"); // load rax into var addr in rdi
 			return;
 	}
 
@@ -79,10 +109,19 @@ void codegen(Node *node) {
 	printf("  .globl main\n");
 	printf("main:\n");
 
+	// Prologue
+	printf("  push %%rbp\n"); // save base pointer
+	printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
+	printf("  sub $%d, %%rsp\n", VAR_STACK_SPACE); // allocate space for variables
+
 	// codegen as we walk down parse tree
 	for (Node *n = node; n; n = n->next) {
 		gen_stmt(n);
 		assert(depth == 0); // stack should be cleared after each stmt at top lvl
 	}
+
+	// epilogue
+	printf("  mov %%rbp, %%rsp\n");
+	printf("  pop %%rbp\n");
 	printf("  ret\n");
 }
