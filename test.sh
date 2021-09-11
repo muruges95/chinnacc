@@ -64,6 +64,9 @@ assert 2 '{ 1; return 2; 3; }'
 assert 3 '{ 1; 2; return 3; }'
 
 assert 3 '{ {1;} {2;} {return 3;} }'
-echo "Tests passed: $test_passed/37"
+
+assert 5 '{ ;; return 5; }'
+assert 4 '{ {} return 4; }'
+echo "Tests passed: $test_passed/39"
 
 echo OK

@@ -58,8 +58,7 @@ static Obj *find_var(Token *tok) {
 
 // This will be delving into actuating the translation scheme
 // Need to write it down before adopting it
-// Currently the rest that is being passed down not being used, likely for 
-// debugging purposes in future commits
+// Currently the rest that is being passed is used to advance the pointer to the token stream outside of the current function
 // EXPRESSIONS
 static Node *expr(Token *tok, Token **rest);
 static Node *assign(Token *tok, Token **rest);
@@ -266,8 +265,12 @@ static Node *compound_stmt(Token *tok, Token **rest) {
 	return node;
 }
 
-// expr-stmt -> expr ";"
+// expr-stmt -> expr? ";"
 static Node *expr_stmt(Token *tok, Token **rest) {
+	if (equal(tok, ";")) {
+		*rest = tok->next;
+		return new_node(ND_BLOCK); // treat as empty block, compiler currently does not gen code for empty blocks
+	}
 	Node *node = new_unary_node(ND_EXPR_STMT, expr(tok, &tok));
 	*rest = skip(tok, ";");
 	return node;
