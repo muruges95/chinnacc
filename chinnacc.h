@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L // enables certain POSIX extensions (see feature_test_macros)
 #include <assert.h>
 #include <ctype.h> // contains util functions for testing and mapping chars (such as if they are alpha num)
 #include <stdarg.h> // allows one to make use of functions with a variable number of arguments using va_x functons and macros
@@ -44,6 +45,14 @@ typedef enum {
 	ND_EXPR_STMT	// expr;
 } NodeKind;
 
+// Local variable
+typedef struct Obj Obj;
+struct Obj {
+	Obj *next; // we store all variables in a linked list for access
+	char *name; // var name
+	int offset; // offset from rbp (position within stack frame)
+};
+
 // AST node type
 typedef struct Node Node;
 
@@ -54,13 +63,20 @@ struct Node {
 	Node *lhs;		// left child of node
 	Node *rhs;		// right child of node
 	int val;		// used if kind == ND_NUM
-	char name;		// used if kind == ND_VAR
+	Obj *var;		// used if kind == ND_VAR
 };
 
-Node *parse(Token *tok);
+typedef struct Function Function;
+struct Function {
+	Node *body;
+	Obj *locals;
+	int stack_size;
+};
+
+Function *parse(Token *tok);
 
 /** CODEGEN **/
-void codegen(Node *node);
+void codegen(Function *prog);
 
 /** UTILITY FNS **/
 

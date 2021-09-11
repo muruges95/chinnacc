@@ -1,5 +1,8 @@
 #include "chinnacc.h"
 
+// All local variable instances created during parsing are stored in a linked list
+Obj *locals; // stack DS
+
 static Node *new_node(NodeKind kind) {
 	Node *node = calloc(1, sizeof(Node));
 	node->kind = kind;
@@ -27,10 +30,30 @@ static Node *new_numeric_node(int val) {
 	return node;
 }
 
-static Node *new_var_node(char name) {
+static Node *new_var_node(Obj *var) {
 	Node *node = new_node(ND_VAR);
-	node->name = name;
+	node->var = var;
 	return node;
+}
+
+// creates an Obj, meant for lvalues
+static Obj *new_lvar(char *name) {
+	Obj *var = calloc(1, sizeof(Obj));
+	var->name = name;
+	var->next = locals; // add to top of locals stack
+	locals = var;
+	// note offset not set here
+	return var;
+}
+
+// find a local var by name from the linked list
+static Obj *find_var(Token *tok) {
+	for (Obj *var = locals; var; var = var->next) {
+		if (strlen(var->name) == tok->len && !strncmp(var->name, tok->loc, tok->len)) {
+			return var;
+		}
+	}
+	return NULL;
 }
 
 // This will be delving into actuating the translation scheme
@@ -62,9 +85,16 @@ static Node *primary(Token *tok, Token **rest) {
 	}
 
 	if (tok->kind == TK_IDENT) {
-		Node *node = new_var_node(*(tok->loc));
+		// first try to find if obj has alr been defined for this identifier in stack
+		Obj *var = find_var(tok);
+		if (!var) {
+			// need to create obj, strndup is a posix fn for which we added the special header
+			// essentially making a copy of the string and using it for the obj
+			// NOTE TO SELF:see what happens if the pointer was passed directly via tok->loc
+			var = new_lvar(strndup(tok->loc, tok->len));
+		}
 		*rest = tok->next;
-		return node;
+		return new_var_node(var);
 	}
 
 	if (tok->kind == TK_NUM) {
@@ -219,12 +249,15 @@ static Node *expr_stmt(Token *tok, Token **rest) {
 
 // top level parsing translation scheme, equivalent to the following
 // program = stmt*
-Node *parse(Token *tok) {
+Function *parse(Token *tok) {
 	Node head = {};
 	Node *cur = &head;
 	while (tok->kind != TK_EOF) {
 		cur = cur->next = stmt(tok, &tok);
 	}
-
-	return head.next;
+	
+	Function *prog = calloc(1, sizeof(Function));
+	prog->body = head.next;
+	prog->locals = locals;
+	return prog;
 }

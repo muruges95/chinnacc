@@ -12,21 +12,34 @@ static void pop(char *arg) {
 	depth--;
 }
 
-static const int VAR_STACK_SPACE = ('z' - 'a' + 1) * 8;
+// Round up `n` to the nearest multiple of `align`. For instance,
+// align_to(5, 8) returns 8 and align_to(11, 8) returns 16.
+static int align_to(int n, int align) {
+	return ((align + n - 1) / align) * align;
+}
 
 // compute the absolute address of a given node and loads it into %rax
 // Gives an error if a given node does not reside in memory (i.e. not an lval)
 static void gen_addr_and_load(Node *node) {
-	// Note: Our variable system is currently configured to store 8 byte values
-	// or 64 bits (like a long). We set aside 8 bytes for each of the 26 possible
-	// 1 char variables at fixed positions. (See below for pos of var and offset)
 	if (node->kind == ND_VAR) {
-		int offset = (node->name - 'a' + 1) * 8;
-		printf("  lea %d(%%rbp), %%rax\n", -offset);
+		printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
 		return;
 	}
 
 	error("Node is not an lvalue.");
+}
+
+// currently we assume that we have a single function and are assigning for
+// all the local variables in it (in a single stack frame). We are traversing
+// the linked list of variables generated during parsing to do this
+static void assign_lvar_offsets(Function *prog) {
+	int offset = 0;
+	for (Obj *var = prog->locals; var; var = var->next) {
+		// for each we assign 8 bytes of space (sufficient for ints and longs)
+		offset += 8;
+		var->offset = -offset;
+	}
+	prog->stack_size = align_to(offset, 16); // possibly a requirement for alignment purposes, need to check c/x64 docs
 }
 
 // Gen code for an expression node
@@ -105,17 +118,18 @@ static void gen_stmt(Node *node) {
 	error("invalid statement");
 }
 
-void codegen(Node *node) {
+void codegen(Function *prog) {
+	assign_lvar_offsets(prog);
 	printf("  .globl main\n");
 	printf("main:\n");
 
 	// Prologue
 	printf("  push %%rbp\n"); // save base pointer
 	printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
-	printf("  sub $%d, %%rsp\n", VAR_STACK_SPACE); // allocate space for variables
+	printf("  sub $%d, %%rsp\n", prog->stack_size); // allocate space for variables
 
 	// codegen as we walk down parse tree
-	for (Node *n = node; n; n = n->next) {
+	for (Node *n = prog->body; n; n = n->next) {
 		gen_stmt(n);
 		assert(depth == 0); // stack should be cleared after each stmt at top lvl
 	}

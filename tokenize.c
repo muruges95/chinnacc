@@ -59,6 +59,18 @@ static Token *new_token(TokenKind kind, char *start, char *end) {
 	return tok;
 }
 
+// check if char is valid as the leading char of identifier
+static bool is_ident_lead(char c) {
+	// allowed chars: [a-zA-Z_]
+	return (('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_');
+}
+
+// checks if char is valid as a non-leading char of identifier
+static bool is_ident_non_lead(char c) {
+	// additionally allows 0-9 as possible chars
+	return is_ident_lead(c) || ('0' <= c && c <= '9');
+}
+
 // compares the leading chars with some short string q
 static bool startswith(char *p, char *q) {
 	return strncmp(p, q, strlen(q)) == 0;
@@ -92,18 +104,23 @@ Token *tokenize(char *p) {
 		if (isdigit(*p)) {
 			// we dont advance the p to the end here as that is being done by strtoul
 			curr = curr->next = new_token(TK_NUM, p, p);
-			char *q = p;
+			char *start = p;
 			curr->val = strtoul(p, &p, 10); // max we can read in is 1 ul worth of digits, also cant read in hexa or octa digits
 			// strtoul also advances pointer p to after the number ends
-			curr->len = p - q;
+			curr->len = p - start;
 			continue;
 		}
 
-		// identifier (currently accepts 'a' to 'z' only, lowercase)
-		if ('a' <= *p && *p <= 'z') {
-			curr = curr->next = new_token(TK_IDENT, p, p+1);
-			p++;
-			continue;
+		// identifier
+		if (is_ident_lead(*p)) {
+			// curr = curr->next = new_token(TK_IDENT, p, p+1);
+			// p++;
+			// continue;
+			char *start = p;
+			do {
+				p++; // keep reading and advancing pointer as char is valid as identifier characters
+			} while (is_ident_non_lead(*p));
+			curr = curr->next = new_token(TK_IDENT, start, p);
 		}
 		
 		// Punctuation

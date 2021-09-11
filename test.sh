@@ -33,10 +33,6 @@ assert 13 '-10+23 ;'
 assert 15 '--+25-10;'
 assert 16 '26---10;'
 
-assert 3 'a=3; a;'
-assert 8 'a=3; z=5; a+z;'
-assert 6 'a=b=3; a+b;'
-
 assert 0 '0==1;'
 assert 1 '42==42;'
 assert 1 '0!=1;'
@@ -56,6 +52,13 @@ assert 1 '1>=0;'
 assert 1 '1>=1;'
 assert 1 '1+3>4*-5;'
 assert 0 '2<=1;'
-echo "Tests passed: $test_passed/31"
+
+assert 3 'a=3; a;'
+assert 8 'a=3; z=5; a+z;'
+assert 6 'a=b=3; a+b;'
+assert 3 'foo=3; foo;'
+assert 8 'foo123=3; bar=5; foo123+bar;'
+
+echo "Tests passed: $test_passed/33"
 
 echo OK
