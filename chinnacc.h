@@ -45,6 +45,8 @@ typedef enum {
 	ND_LTE,			// expr1 <= expr2
 	ND_BLOCK,		// { ... }
 	ND_IF,			// if stmt
+	ND_FOR,			// for or while stmt
+	ND_DOWHILE,		// do-while
 	ND_RETURN,		// return expr;
 	ND_EXPR_STMT	// expr;
 } NodeKind;
@@ -71,10 +73,16 @@ struct Node {
 	int val;		// used if kind == ND_NUM
 	Obj *var;		// used if kind == ND_VAR
 
-	// if stmt related
+	// conditional based expr/stmts
 	Node *cond;
-	Node *then;
+
+	// if stmts
+	Node *then; // also used as the stmt body in some stmts
 	Node *els;
+
+	// for stmts
+	Node *init;
+	Node *inc;
 
 	// Linked list of nodes for blocks
 	Node *body;

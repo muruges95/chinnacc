@@ -235,14 +235,34 @@ static Node *unary(Token *tok, Token **rest) {
 	return primary(tok, rest);
 }
 
-// stmt -> "return" expr ";"
+// stmt -> "return" expr ";" // we dont use expr-stmt as what we want to return is just the expr, so that should be the child node
+//      | "for" "(" expr-stmt expr? ";" expr? ")" // stmt we dont use an expr-stmt for the conditional as we want our conditional to be an expression not a stmt, just like while and if
 //      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "while" "(" expr ")" stmt
+//      | "do" stmt "while" "(" expr ")" ";"
 //      | "{" compound-stmt (for blocks)
 //      | expr-stmt
 static Node *stmt(Token *tok, Token **rest) {
 	if (equal(tok, "return")) {
 		Node *node = new_unary_node(ND_RETURN, expr(tok->next, &tok));
 		*rest = skip(tok, ";");
+		return node;
+	}
+
+	if (equal(tok, "for")) {
+		Node *node = new_node(ND_FOR);
+		tok = skip(tok->next, "(");
+		node->init = expr_stmt(tok, &tok);
+		if (!equal(tok, ";")) {
+			node->cond = expr(tok, &tok);
+		}
+		tok = skip(tok, ";");
+		if (!equal(tok, ")")) {
+			node->inc = expr(tok, &tok);
+		}
+		tok = skip(tok, ")");
+		node->then = stmt(tok, &tok);
+		*rest = tok;
 		return node;
 	}
 
@@ -256,6 +276,27 @@ static Node *stmt(Token *tok, Token **rest) {
 			node->els = stmt(tok->next, &tok);
 		}
 		*rest = tok;
+		return node;
+	}
+
+	if (equal(tok, "while")) {
+		Node *node = new_node(ND_FOR);
+		tok = skip(tok->next, "(");
+		node->cond = expr(tok, &tok);
+		tok = skip(tok, ")");
+		node->then = stmt(tok, &tok);
+		*rest = tok;
+		return node;
+	}
+
+	if (equal(tok, "do")) {
+		Node *node = new_node(ND_DOWHILE);
+		node->then = stmt(tok->next, &tok);
+		tok = skip(tok, "while");
+		tok = skip(tok, "(");
+		node->cond = expr(tok, &tok);
+		tok = skip(tok, ")");
+		*rest = skip(tok, ";");
 		return node;
 	}
 
