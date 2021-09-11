@@ -86,6 +86,16 @@ static int read_punct(char *p) {
 
 	return ispunct(*p) ? 1 : 0;
 }
+
+// Do one pass to convert tokens containing keywords (classified as identifiers) into keyword type tokens
+static void convert_keywords(Token *tok) {
+	for (Token *t = tok; t; t = t->next) {
+		if (equal(t, "return")) {
+			t->kind = TK_KEYWORD;
+		}
+	}
+}
+
 // Tokenize the input string and returns the new tokens
 // current input is a global pointer for error reporting purposes
 Token *tokenize(char *p) {
@@ -111,16 +121,14 @@ Token *tokenize(char *p) {
 			continue;
 		}
 
-		// identifier
+		// identifier or possibly keyword
 		if (is_ident_lead(*p)) {
-			// curr = curr->next = new_token(TK_IDENT, p, p+1);
-			// p++;
-			// continue;
 			char *start = p;
 			do {
 				p++; // keep reading and advancing pointer as char is valid as identifier characters
 			} while (is_ident_non_lead(*p));
 			curr = curr->next = new_token(TK_IDENT, start, p);
+			continue;
 		}
 		
 		// Punctuation
@@ -134,6 +142,7 @@ Token *tokenize(char *p) {
     }
 
 	curr = curr->next = new_token(TK_EOF, p, p);
+	convert_keywords(head.next);
     return head.next;
 }
 

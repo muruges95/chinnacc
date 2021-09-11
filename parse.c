@@ -236,7 +236,13 @@ static Node *unary(Token *tok, Token **rest) {
 }
 
 // stmt -> expr-stmt (more to come as we implmnt them)
+//      |  "return" expr ";" // can be separated out later
 static Node *stmt(Token *tok, Token **rest) {
+	if (equal(tok, "return")) {
+		Node *node = new_unary_node(ND_RETURN, expr(tok->next, &tok));
+		*rest = skip(tok, ";");
+		return node;
+	}
 	return expr_stmt(tok, rest);
 }
 

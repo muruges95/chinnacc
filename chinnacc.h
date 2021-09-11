@@ -13,6 +13,7 @@ typedef enum {
 	TK_PUNCT,	// Punctuators
 	TK_IDENT,	// Identifiers
 	TK_NUM,		// Numeric literals
+	TK_KEYWORD,	// Keywords
 	TK_EOF,		// End of file markers
 } TokenKind;
 
@@ -42,6 +43,7 @@ typedef enum {
 	ND_NE,			// expr1 != expr2
 	ND_LT,			// expr1 < expr2
 	ND_LTE,			// expr1 <= expr2
+	ND_RETURN,		// return expr;
 	ND_EXPR_STMT	// expr;
 } NodeKind;
 
