@@ -87,10 +87,21 @@ static int read_punct(char *p) {
 	return ispunct(*p) ? 1 : 0;
 }
 
+static bool is_keyword(Token *tok) {
+	static char *keyword_list[] = {"return", "if", "else"};
+	// using size of instead of the list size to accomodate growth in list easily
+	for (int i=0; i < sizeof(keyword_list) / sizeof(*keyword_list); i++) {
+		if (equal(tok, keyword_list[i])) {
+			return true;
+		}
+	}
+	return false;
+}
+
 // Do one pass to convert tokens containing keywords (classified as identifiers) into keyword type tokens
 static void convert_keywords(Token *tok) {
 	for (Token *t = tok; t; t = t->next) {
-		if (equal(t, "return")) {
+		if (is_keyword(t)) {
 			t->kind = TK_KEYWORD;
 		}
 	}

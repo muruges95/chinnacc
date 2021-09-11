@@ -67,6 +67,15 @@ assert 3 '{ {1;} {2;} {return 3;} }'
 
 assert 5 '{ ;; return 5; }'
 assert 4 '{ {} return 4; }'
-echo "Tests passed: $test_passed/39"
+
+assert 3 '{ if (0) return 2; return 3; }'
+assert 3 '{ if (1-1) return 2; return 3; }'
+assert 2 '{ if (1) return 2; return 3; }'
+assert 2 '{ if (2-1) return 2; return 3; }'
+assert 4 '{ if (0) { 1; 2; return 3; } else { return 4; } }'
+assert 3 '{ if (1) { 1; 2; return 3; } else { return 4; } }'
+assert 2 '{ x=2; if (x-2) { return x-1; } else if (x-1) return x; else { return 0; } }'
+
+echo "Tests passed: $test_passed/46"
 
 echo OK

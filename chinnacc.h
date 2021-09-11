@@ -44,6 +44,7 @@ typedef enum {
 	ND_LT,			// expr1 < expr2
 	ND_LTE,			// expr1 <= expr2
 	ND_BLOCK,		// { ... }
+	ND_IF,			// if stmt
 	ND_RETURN,		// return expr;
 	ND_EXPR_STMT	// expr;
 } NodeKind;
@@ -63,10 +64,17 @@ typedef struct Node Node;
 struct Node {
 	NodeKind kind;	// type of node
 	Node *next;		// for storing next node in a sequence of statements (block)
+	
 	Node *lhs;		// left child of node
 	Node *rhs;		// right child of node
+	
 	int val;		// used if kind == ND_NUM
 	Obj *var;		// used if kind == ND_VAR
+
+	// if stmt related
+	Node *cond;
+	Node *then;
+	Node *els;
 
 	// Linked list of nodes for blocks
 	Node *body;

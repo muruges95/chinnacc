@@ -236,12 +236,26 @@ static Node *unary(Token *tok, Token **rest) {
 }
 
 // stmt -> "return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "{" compound-stmt (for blocks)
 //      | expr-stmt
 static Node *stmt(Token *tok, Token **rest) {
 	if (equal(tok, "return")) {
 		Node *node = new_unary_node(ND_RETURN, expr(tok->next, &tok));
 		*rest = skip(tok, ";");
+		return node;
+	}
+
+	if (equal(tok, "if")) {
+		Node *node = new_node(ND_IF);
+		tok = skip(tok->next, "(");
+		node->cond = expr(tok, &tok);
+		tok = skip(tok, ")");
+		node->then = stmt(tok, &tok);
+		if (equal(tok, "else")) {
+			node->els = stmt(tok->next, &tok);
+		}
+		*rest = tok;
 		return node;
 	}
 
