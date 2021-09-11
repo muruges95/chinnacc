@@ -73,6 +73,7 @@ static Node *primary(Token *tok, Token **rest);
 // STATEMENTS
 static Node *stmt(Token *tok, Token **rest);
 static Node *expr_stmt(Token *tok, Token **rest);
+static Node *compound_stmt(Token *tok, Token **rest);
 
 // primary: the units that are unbreakable, start with this,
 // will also include the non-terminal involved in the lowest precedence ops
@@ -235,15 +236,34 @@ static Node *unary(Token *tok, Token **rest) {
 	return primary(tok, rest);
 }
 
-// stmt -> expr-stmt (more to come as we implmnt them)
-//      |  "return" expr ";" // can be separated out later
+// stmt -> "return" expr ";"
+//      | "{" compound-stmt (for blocks)
+//      | expr-stmt
 static Node *stmt(Token *tok, Token **rest) {
 	if (equal(tok, "return")) {
 		Node *node = new_unary_node(ND_RETURN, expr(tok->next, &tok));
 		*rest = skip(tok, ";");
 		return node;
 	}
+
+	if (equal(tok, "{")) {
+		return compound_stmt(tok->next, rest);
+	}
 	return expr_stmt(tok, rest);
+}
+
+// compound-stmt -> stmt* "}"
+static Node *compound_stmt(Token *tok, Token **rest) {
+	Node head = {};
+	Node *body_node = &head;
+
+	while (!equal(tok, "}")) {
+		body_node = body_node->next = stmt(tok, &tok);
+	}
+	Node *node = new_node(ND_BLOCK);
+	node->body = head.next;
+	*rest = tok->next;
+	return node;
 }
 
 // expr-stmt -> expr ";"
@@ -256,14 +276,9 @@ static Node *expr_stmt(Token *tok, Token **rest) {
 // top level parsing translation scheme, equivalent to the following
 // program = stmt*
 Function *parse(Token *tok) {
-	Node head = {};
-	Node *cur = &head;
-	while (tok->kind != TK_EOF) {
-		cur = cur->next = stmt(tok, &tok);
-	}
-	
+	tok = skip(tok, "{");
 	Function *prog = calloc(1, sizeof(Function));
-	prog->body = head.next;
+	prog->body = compound_stmt(tok, &tok);
 	prog->locals = locals;
 	return prog;
 }

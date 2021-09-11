@@ -43,6 +43,7 @@ typedef enum {
 	ND_NE,			// expr1 != expr2
 	ND_LT,			// expr1 < expr2
 	ND_LTE,			// expr1 <= expr2
+	ND_BLOCK,		// { ... }
 	ND_RETURN,		// return expr;
 	ND_EXPR_STMT	// expr;
 } NodeKind;
@@ -66,6 +67,9 @@ struct Node {
 	Node *rhs;		// right child of node
 	int val;		// used if kind == ND_NUM
 	Obj *var;		// used if kind == ND_VAR
+
+	// Linked list of nodes for blocks
+	Node *body;
 };
 
 typedef struct Function Function;
