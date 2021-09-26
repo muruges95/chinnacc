@@ -32,7 +32,7 @@ static void gen_addr_and_load(Node *node) {
 		return;
 	}
 
-	error("Node is not an lvalue.");
+	error_tok(node->tok, "invalid expression");
 }
 
 // currently we assume that we have a single function and are assigning for
@@ -113,7 +113,7 @@ static void gen_expr(Node *node) {
 			return;
 	}
 
-	error("invalid expression");
+	error_tok(node->tok, "invalid expression");
 }
 
 static void gen_stmt(Node *node) {
@@ -173,7 +173,7 @@ static void gen_stmt(Node *node) {
 			gen_expr(node->lhs);
 			return;
 	}
-	error("invalid statement");
+	error_tok(node->tok, "invalid statement");
 }
 
 void codegen(Function *prog) {

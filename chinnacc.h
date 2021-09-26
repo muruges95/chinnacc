@@ -66,6 +66,7 @@ typedef struct Node Node;
 struct Node {
 	NodeKind kind;	// type of node
 	Node *next;		// for storing next node in a sequence of statements (block)
+	Token *tok;		// token being represented by node (for error msgs)
 	
 	Node *lhs;		// left child of node
 	Node *rhs;		// right child of node
