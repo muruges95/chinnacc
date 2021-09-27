@@ -34,6 +34,8 @@ typedef enum {
 	ND_NUM,			// Integer
 	ND_VAR,			// Variable
 	ND_NEG,			// -expr
+	ND_ADDR,		// &expr
+	ND_DEREF,		// *expr
 	ND_ADD,			// expr1 + expr2
 	ND_SUB,			// expr1 - expr2
 	ND_MUL,			// expr1 * expr2

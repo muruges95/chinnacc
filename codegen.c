@@ -2,6 +2,9 @@
 
 static int depth; // stack depth
 
+static void gen_expr(Node *node);
+static void gen_stmt(Node *node);
+
 // for generating sections to jump to
 static int count(void) {
 	static int i = 1;
@@ -28,8 +31,14 @@ static int align_to(int n, int align) {
 // Gives an error if a given node does not reside in memory (i.e. not an lval)
 static void gen_addr_and_load(Node *node) {
 	if (node->kind == ND_VAR) {
-		printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
-		return;
+	}
+	switch (node->kind) {
+		case ND_VAR:
+			printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
+			return;
+		case ND_DEREF:
+			gen_expr(node->lhs);
+			return;
 	}
 
 	error_tok(node->tok, "invalid expression");
@@ -62,6 +71,13 @@ static void gen_expr(Node *node) {
 			gen_addr_and_load(node);
 			// deref addr in rax and store val back in rax
 			printf("  mov (%%rax), %%rax\n");
+			return;
+		case ND_DEREF:
+			gen_expr(node->lhs);
+			printf("  mov (%%rax), %%rax\n");
+			return;
+		case ND_ADDR:
+			gen_addr_and_load(node->lhs);
 			return;
 		case ND_ASSIGN:
 			gen_addr_and_load(node->lhs);

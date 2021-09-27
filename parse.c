@@ -234,7 +234,7 @@ static Node *mul(Token **tok_loc) {
 }
 
 // unary, next precedence level
-// Translation scheme: unary -> primary | "+" unary | "-" unary
+// Translation scheme: unary -> primary | "+" unary | "-" unary | "*" unary | "&" unary
 // In this case the handling is slightly diff for all 3 cases
 
 static Node *unary(Token **tok_loc) {
@@ -247,6 +247,14 @@ static Node *unary(Token **tok_loc) {
 	if (equal(tok, "-")) {
 		*tok_loc = tok->next;
 		return new_unary_node(ND_NEG, unary(tok_loc), tok);
+	}
+	if (equal(tok, "&")) {
+		*tok_loc = tok->next;
+		return new_unary_node(ND_ADDR, unary(tok_loc), tok);
+	}
+	if (equal(tok, "*")) {
+		*tok_loc = tok->next;
+		return new_unary_node(ND_DEREF, unary(tok_loc), tok);
 	}
 
 	return primary(tok_loc);
