@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+typedef struct Type Type;
+
 /** TOKENIZER **/
 
 typedef enum {
@@ -66,10 +68,10 @@ typedef struct Node Node;
 
 // node data stuct is a mix of a tree and a linked list struct
 struct Node {
-	NodeKind kind;	// type of node
+	NodeKind kind;	// kind of node
 	Node *next;		// for storing next node in a sequence of statements (block)
 	Token *tok;		// token being represented by node (for error msgs)
-	
+	Type *ty;		// type of node (e.g. int vs int ptr)
 	Node *lhs;		// left child of node
 	Node *rhs;		// right child of node
 	
@@ -99,6 +101,23 @@ struct Function {
 };
 
 Function *parse(Token *tok);
+
+// Node type fns
+
+typedef enum {
+	TY_INT,
+	TY_PTR,
+} TypeKind;
+
+struct Type {
+	TypeKind kind;
+	Type *base;
+};
+
+extern Type *ty_int;
+
+bool is_integer(Type *ty);
+void add_type(Node *node);
 
 /** CODEGEN **/
 void codegen(Function *prog);

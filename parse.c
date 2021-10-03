@@ -181,6 +181,62 @@ static Node *relational(Token **tok_loc) {
 	}
 }
 
+// Implementation of the overloaded add and subtract operators
+// for these, we need to do early type inference to know how to deal with the ops
+// we are currently mul/div by 8 because that is the int size but this needs to eventually change to the size of the base types of the ptrs
+static Node *new_add_node(Node *lhs, Node *rhs, Token *tok) {
+	add_type(lhs);
+	add_type(rhs);
+
+	// int + int
+	if (is_integer(lhs->ty) && is_integer(rhs->ty))
+		return new_binary_node(ND_ADD, lhs, rhs, tok);
+	
+	// in  case of ptr + ptr
+	if (lhs->ty->base && rhs->ty->base) {
+		error_tok(tok, "invalid operand types");
+	}
+
+	// switch num + ptr to become ptr + num so type inference correctly infers ptr type as the result of the op
+	
+	if (!lhs->ty->base && rhs->ty->base) {
+		Node *tmp = lhs;
+		lhs = rhs;
+		rhs = tmp;
+	}
+
+	// ptr + num
+	rhs = new_binary_node(ND_MUL, rhs, new_numeric_node(8, tok), tok);
+	return new_binary_node(ND_ADD, lhs, rhs, tok);
+}
+
+// similar to the overloaded add but we have to additionally handle when we have two ptrs
+
+static Node *new_sub_node(Node *lhs, Node *rhs, Token *tok) {
+	add_type(lhs);
+	add_type(rhs);
+
+	// int - int
+	if (is_integer(lhs->ty) && is_integer(rhs->ty)) {
+		return new_binary_node(ND_SUB, lhs, rhs, tok);
+	}
+
+	// in case of ptr - num
+	if (lhs->ty->base && is_integer(rhs->ty)) {
+		rhs = new_binary_node(ND_MUL, rhs, new_numeric_node(8, tok), tok);
+		return new_binary_node(ND_SUB, lhs, rhs, tok);
+	}
+
+	// ptr - ptr
+	if (lhs->ty->base && rhs->ty->base) {
+		Node *node = new_binary_node(ND_SUB, lhs, rhs, tok);
+		node->ty = ty_int;
+		return new_binary_node(ND_DIV, node, new_numeric_node(8, tok), tok);
+	}
+
+	error_tok(tok, "invalid operand types");
+}
+
 // Translation scheme: add -> mul | add "+" mul | add "-" mul
 // With regex (as per chibicc): add -> mul ("+" mul | "-" mul)* (using this)
 
@@ -196,12 +252,12 @@ static Node *add(Token **tok_loc) {
 		Token *tok = *tok_loc;
 		if (equal(tok, "+")) {
 			*tok_loc = tok->next;
-			node = new_binary_node(ND_ADD, node, mul(tok_loc), tok);
+			node = new_add_node(node, mul(tok_loc), tok);
 			continue;
 		}
 		if (equal(tok, "-")) {
 			*tok_loc = tok->next;
-			node = new_binary_node(ND_SUB, node, mul(tok_loc), tok);
+			node = new_sub_node(node, mul(tok_loc), tok);
 			continue;
 		}
 		return node; // if reached, exit the loop
@@ -341,6 +397,7 @@ static Node *compound_stmt(Token **tok_loc) {
 	Node *node = new_node(ND_BLOCK, *tok_loc);
 	while (!equal(*tok_loc, "}")) {
 		body_node = body_node->next = stmt(tok_loc);
+		add_type(body_node);
 	}
 	*tok_loc = (*tok_loc)->next;
 	node->body = head.next;
