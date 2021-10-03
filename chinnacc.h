@@ -58,9 +58,10 @@ typedef enum {
 // Local variable
 typedef struct Obj Obj;
 struct Obj {
-	Obj *next; // we store all variables in a linked list for access
-	char *name; // var name
-	int offset; // offset from rbp (position within stack frame)
+	Obj *next;	// we store all variables in a linked list for access
+	char *name;	// var name
+	Type *ty;	// Type
+	int offset;	// offset from rbp (position within stack frame)
 };
 
 // AST node type
@@ -111,12 +112,17 @@ typedef enum {
 
 struct Type {
 	TypeKind kind;
+	// if ptr
 	Type *base;
+
+	// storing the token where we do the type decl
+	Token *name;
 };
 
 extern Type *ty_int;
 
 bool is_integer(Type *ty);
+Type *pointer_to(Type *base);
 void add_type(Node *node);
 
 /** CODEGEN **/
@@ -126,6 +132,7 @@ void codegen(Function *prog);
 
 bool equal(Token *tok, char *fmt);
 Token *skip(Token *tok, char *s);
+bool consume(Token **tok_loc, char *str);
 
 /** ERROR REPORTING **/
 

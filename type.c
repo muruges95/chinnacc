@@ -46,18 +46,19 @@ void add_type(Node *node) {
 		case ND_NE:
 		case ND_LT:
 		case ND_LTE:
-		case ND_VAR:
 		case ND_NUM:
 			node->ty = ty_int; // use a constant where we can to save space
+			return;
+		case ND_VAR:
+			node->ty = node->var->ty;
 			return;
 		case ND_ADDR:
 			node->ty = pointer_to(node->lhs->ty);
 			return;
 		case ND_DEREF:
-			if (node->lhs->ty->kind == TY_PTR)
-				node->ty = node->lhs->ty->base;
-			else
-				node->ty = ty_int; // this is just to catch this erroneous case and not stop the type inference
+			if (node->lhs->ty->kind != TY_PTR)
+				error_tok(node->tok, "invalid pointer dereference");
+			node->ty = node->lhs->ty->base;
 			return;
 	}
 }

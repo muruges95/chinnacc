@@ -38,13 +38,23 @@ static Node *new_var_node(Obj *var, Token *tok) {
 }
 
 // creates an Obj, meant for lvalues
-static Obj *new_lvar(char *name) {
+static Obj *new_lvar(char *name, Type *ty) {
 	Obj *var = calloc(1, sizeof(Obj));
 	var->name = name;
+	var->ty = ty;
 	var->next = locals; // add to top of locals stack
 	locals = var;
 	// note offset not set here
 	return var;
+}
+
+static char *get_ident(Token *tok) {
+	// need to create obj, strndup is a posix fn for which we added the special header
+	// essentially making a copy of the string and using it for the obj
+	// NOTE TO SELF:see what happens if the pointer was passed directly via tok->loc
+	if (tok->kind != TK_IDENT)
+		error_tok(tok, "expected an identifier");
+	return strndup(tok->loc, tok->len);
 }
 
 // find a local var by name from the linked list
@@ -71,6 +81,7 @@ static Node *unary(Token **tok_loc);
 static Node *primary(Token **tok_loc);
 
 // STATEMENTS
+static Node *declaration(Token **tok_loc);
 static Node *stmt(Token **tok_loc);
 static Node *expr_stmt(Token **tok_loc);
 static Node *compound_stmt(Token **tok_loc);
@@ -79,22 +90,18 @@ static Node *compound_stmt(Token **tok_loc);
 // will also include the non-terminal involved in the lowest precedence ops
 // Translation scheme: primary -> "(" expr ")" | ident | num
 static Node *primary(Token **tok_loc) {
-	Token *tok = *tok_loc;
-	if (equal(tok, "(")) {
-		*tok_loc = tok->next;
+	if (consume(tok_loc, "(")) {
 		Node *node = expr(tok_loc);
 		*tok_loc = skip(*tok_loc, ")");
 		return node;
 	}
 
+	Token *tok = *tok_loc;
 	if (tok->kind == TK_IDENT) {
 		// first try to find if obj has alr been defined for this identifier in stack
 		Obj *var = find_var(tok);
 		if (!var) {
-			// need to create obj, strndup is a posix fn for which we added the special header
-			// essentially making a copy of the string and using it for the obj
-			// NOTE TO SELF:see what happens if the pointer was passed directly via tok->loc
-			var = new_lvar(strndup(tok->loc, tok->len));
+			error_tok(tok, "undefined variable");
 		}
 		*tok_loc = tok->next;
 		return new_var_node(var, tok);
@@ -123,8 +130,7 @@ static Node *assign(Token **tok_loc) {
 	Node *node = equality(tok_loc);
 	Token *tok = *tok_loc;
 	
-	if (equal(tok, "=")) {
-		*tok_loc = tok->next;
+	if (consume(tok_loc, "=")) {
 		return new_binary_node(ND_ASSIGN, node, assign(tok_loc), tok);
 	}
 	return node;
@@ -137,13 +143,11 @@ static Node *equality(Token **tok_loc) {
 
 	for (;;) {
 		Token *tok = *tok_loc;
-		if (equal(tok, "==")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "==")) {
 			node = new_binary_node(ND_EQ, node, relational(tok_loc), tok);
 			continue;
 		}
-		if (equal(tok, "!=")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "!=")) {
 			node = new_binary_node(ND_NE, node, relational(tok_loc), tok);
 			continue;
 		}
@@ -157,23 +161,19 @@ static Node *relational(Token **tok_loc) {
 
 	for (;;) {
 		Token *tok = *tok_loc;
-		if (equal(tok, "<")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "<")) {
 			node = new_binary_node(ND_LT, node, add(tok_loc), tok);
 			continue;
 		}
-		if (equal(tok, ">")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, ">")) {
 			node = new_binary_node(ND_LT, add(tok_loc), node, tok);
 			continue;
 		}
-		if (equal(tok, "<=")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "<=")) {
 			node = new_binary_node(ND_LTE, node, add(tok_loc), tok);
 			continue;
 		}
-		if (equal(tok, ">=")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, ">=")) {
 			node = new_binary_node(ND_LTE, add(tok_loc), node, tok);
 			continue;
 		}
@@ -250,13 +250,11 @@ static Node *add(Token **tok_loc) {
 	**/
 	for (;;) {
 		Token *tok = *tok_loc;
-		if (equal(tok, "+")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "+")) {
 			node = new_add_node(node, mul(tok_loc), tok);
 			continue;
 		}
-		if (equal(tok, "-")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "-")) {
 			node = new_sub_node(node, mul(tok_loc), tok);
 			continue;
 		}
@@ -274,13 +272,11 @@ static Node *mul(Token **tok_loc) {
 
 	for (;;) {
 		Token *tok = *tok_loc;
-		if (equal(tok, "*")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "*")) {
 			node = new_binary_node(ND_MUL, node, unary(tok_loc), tok);
 			continue;
 		}
-		if (equal(tok, "/")) {
-			*tok_loc = tok->next;
+		if (consume(tok_loc, "/")) {
 			node = new_binary_node(ND_DIV, node, unary(tok_loc), tok);
 			continue;
 		}
@@ -296,20 +292,16 @@ static Node *mul(Token **tok_loc) {
 static Node *unary(Token **tok_loc) {
 	// ignore + unary
 	Token *tok = *tok_loc;
-	if (equal(tok, "+")) {
-		*tok_loc = tok->next;
+	if (consume(tok_loc, "+")) {
 		return unary(tok_loc);
 	}
-	if (equal(tok, "-")) {
-		*tok_loc = tok->next;
+	if (consume(tok_loc, "-")) {
 		return new_unary_node(ND_NEG, unary(tok_loc), tok);
 	}
-	if (equal(tok, "&")) {
-		*tok_loc = tok->next;
+	if (consume(tok_loc, "&")) {
 		return new_unary_node(ND_ADDR, unary(tok_loc), tok);
 	}
-	if (equal(tok, "*")) {
-		*tok_loc = tok->next;
+	if (consume(tok_loc, "*")) {
 		return new_unary_node(ND_DEREF, unary(tok_loc), tok);
 	}
 
@@ -325,17 +317,16 @@ static Node *unary(Token **tok_loc) {
 //      | expr-stmt
 static Node *stmt(Token **tok_loc) {
 	Token *tok = *tok_loc;
-	if (equal(tok, "return")) {
+	if (consume(tok_loc, "return")) {
 		Node *node = new_node(ND_RETURN, tok);
-		*tok_loc = tok->next;
 		node->lhs = expr(tok_loc);
 		*tok_loc = skip(*tok_loc, ";");
 		return node;
 	}
 
-	if (equal(tok, "for")) {
+	if (consume(tok_loc, "for")) {
 		Node *node = new_node(ND_FOR, tok);
-		*tok_loc = skip(tok->next, "(");
+		*tok_loc = skip(*tok_loc, "(");
 		node->init = expr_stmt(tok_loc);
 		if (!equal(*tok_loc, ";")) {
 			node->cond = expr(tok_loc);
@@ -349,31 +340,29 @@ static Node *stmt(Token **tok_loc) {
 		return node;
 	}
 
-	if (equal(tok, "if")) {
+	if (consume(tok_loc, "if")) {
 		Node *node = new_node(ND_IF, tok);
-		*tok_loc = skip(tok->next, "(");
+		*tok_loc = skip(*tok_loc, "(");
 		node->cond = expr(tok_loc);
 		*tok_loc = skip(*tok_loc, ")");
 		node->then = stmt(tok_loc);
-		if (equal(*tok_loc, "else")) {
-			*tok_loc = (*tok_loc)->next;
+		if (consume(tok_loc, "else")) {
 			node->els = stmt(tok_loc);
 		}
 		return node;
 	}
 
-	if (equal(tok, "while")) {
+	if (consume(tok_loc, "while")) {
 		Node *node = new_node(ND_FOR, tok);
-		*tok_loc = skip(tok->next, "(");
+		*tok_loc = skip(*tok_loc, "(");
 		node->cond = expr(tok_loc);
 		*tok_loc = skip(*tok_loc, ")");
 		node->then = stmt(tok_loc);
 		return node;
 	}
 
-	if (equal(tok, "do")) {
+	if (consume(tok_loc, "do")) {
 		Node *node = new_node(ND_DOWHILE, tok);
-		*tok_loc = tok->next;
 		node->then = stmt(tok_loc);
 		*tok_loc = skip(*tok_loc, "while");
 		*tok_loc = skip(*tok_loc, "(");
@@ -390,17 +379,74 @@ static Node *stmt(Token **tok_loc) {
 	return expr_stmt(tok_loc);
 }
 
-// compound-stmt -> stmt* "}"
+// compound-stmt -> (declaration | stmt)* "}"
 static Node *compound_stmt(Token **tok_loc) {
 	Node head = {};
 	Node *body_node = &head;
 	Node *node = new_node(ND_BLOCK, *tok_loc);
 	while (!equal(*tok_loc, "}")) {
-		body_node = body_node->next = stmt(tok_loc);
+		if (equal(*tok_loc, "int"))
+			body_node = body_node->next = declaration(tok_loc);
+		else
+			body_node = body_node->next = stmt(tok_loc);
 		add_type(body_node);
 	}
 	*tok_loc = (*tok_loc)->next;
 	node->body = head.next;
+	return node;
+}
+
+// declaration and helper fns
+
+// declspec = "int"
+static Type *declspec(Token **tok_loc) {
+	*tok_loc = skip(*tok_loc, "int");
+	return ty_int;
+}
+
+// declarator = "*"* ident
+static Type *declarator(Token **tok_loc, Type *ty) {
+	while (consume(tok_loc, "*"))
+		ty = pointer_to(ty);
+
+	Token *tok = *tok_loc;
+
+	if (tok->kind != TK_IDENT)
+		error_tok(tok, "expected a variable name");
+
+	ty->name = tok;
+	*tok_loc = tok->next;
+	return ty;
+}
+
+// declaration = declspec (declarator ("=" expr)? ("," declarator ("=" expr)?)*)? ";"
+static Node *declaration(Token **tok_loc) {
+	Type *basety = declspec(tok_loc);
+
+	Node head = {};
+	Node *cur = &head;
+	int i = 0;
+
+	while (!equal(*tok_loc, ";")) {
+		// if multiple decl, skip the commas
+		if (i++ > 0)
+			*tok_loc = skip(*tok_loc, ",");
+
+		Type *ty = declarator(tok_loc, basety);
+		Obj *var = new_lvar(get_ident(ty->name), ty);
+
+		if (!consume(tok_loc, "="))
+			continue;
+
+		Node *lhs = new_var_node(var, ty->name);
+		Node *rhs = assign(tok_loc);
+		Node *node = new_binary_node(ND_ASSIGN, lhs, rhs, *tok_loc);
+		cur = cur->next = new_unary_node(ND_EXPR_STMT, node, *tok_loc);
+	}
+
+	Node *node = new_node(ND_BLOCK, *tok_loc);
+	node->body = head.next;
+	*tok_loc = (*tok_loc)->next;
 	return node;
 }
 

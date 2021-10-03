@@ -51,6 +51,16 @@ Token *skip(Token *tok, char *s) {
 	return tok->next;
 }
 
+// if next set of chars match 'str' return true and consume it in token stream
+bool consume(Token **tok_loc, char *str) {
+	Token *tok = *tok_loc;
+	if (equal(tok, str)) {
+		*tok_loc = tok->next;
+		return true;
+	}
+	return false;
+}
+
 static Token *new_token(TokenKind kind, char *start, char *end) {
 	Token *tok = calloc(1, sizeof(Token));
 	tok->kind = kind;
@@ -88,7 +98,7 @@ static int read_punct(char *p) {
 }
 
 static bool is_keyword(Token *tok) {
-	static char *keyword_list[] = {"return", "if", "else", "for", "while", "do"};
+	static char *keyword_list[] = {"return", "if", "else", "for", "while", "do", "int"};
 	// using size of instead of the list size to accomodate growth in list easily
 	for (int i=0; i < sizeof(keyword_list) / sizeof(*keyword_list); i++) {
 		if (equal(tok, keyword_list[i])) {
