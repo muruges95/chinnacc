@@ -47,6 +47,7 @@ typedef enum {
 	ND_NE,			// expr1 != expr2
 	ND_LT,			// expr1 < expr2
 	ND_LTE,			// expr1 <= expr2
+	ND_FNCALL,		// Function call
 	ND_BLOCK,		// { ... }
 	ND_IF,			// if stmt
 	ND_FOR,			// for or while stmt
@@ -92,6 +93,9 @@ struct Node {
 
 	// Linked list of nodes for blocks
 	Node *body;
+
+	// For Function calls
+	char *fnname;
 };
 
 typedef struct Function Function;

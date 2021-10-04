@@ -88,7 +88,8 @@ static Node *compound_stmt(Token **tok_loc);
 
 // primary: the units that are unbreakable, start with this,
 // will also include the non-terminal involved in the lowest precedence ops
-// Translation scheme: primary -> "(" expr ")" | ident | num
+// Translation scheme: primary -> "(" expr ")" | ident args? | num
+// , where args -> "(" ")"
 static Node *primary(Token **tok_loc) {
 	if (consume(tok_loc, "(")) {
 		Node *node = expr(tok_loc);
@@ -98,6 +99,15 @@ static Node *primary(Token **tok_loc) {
 
 	Token *tok = *tok_loc;
 	if (tok->kind == TK_IDENT) {
+		// Function call
+		if (equal(tok->next, "(")) {
+			Node *node = new_node(ND_FNCALL, tok);
+			node->fnname = strndup(tok->loc, tok->len);
+			*tok_loc = skip(tok->next->next, ")");
+			return node;
+		}
+
+		// Variable
 		// first try to find if obj has alr been defined for this identifier in stack
 		Obj *var = find_var(tok);
 		if (!var) {
