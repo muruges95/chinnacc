@@ -86,10 +86,30 @@ static Node *stmt(Token **tok_loc);
 static Node *expr_stmt(Token **tok_loc);
 static Node *compound_stmt(Token **tok_loc);
 
+// fncall -> ident "(" (assign ("," assign)*)? ")"
+static Node *fncall(Token **tok_loc) {
+	Token *tok = *tok_loc;
+	*tok_loc = tok->next->next;
+
+	Node head = {};
+	Node *cur = &head;
+
+	while (!consume(tok_loc, ")")) {
+		if (cur != &head)
+			*tok_loc = skip(*tok_loc, ",");
+		cur = cur->next = assign(tok_loc);
+	}
+
+	Node *node = new_node(ND_FNCALL, tok);
+	node->fnname = strndup(tok->loc, tok->len);
+	node->args = head.next;
+	return node;
+}
+
 // primary: the units that are unbreakable, start with this,
 // will also include the non-terminal involved in the lowest precedence ops
-// Translation scheme: primary -> "(" expr ")" | ident args? | num
-// , where args -> "(" ")"
+// Translation scheme: primary -> "(" expr ")" | ident fn-args? | num
+// Note that fncall handling is done separately
 static Node *primary(Token **tok_loc) {
 	if (consume(tok_loc, "(")) {
 		Node *node = expr(tok_loc);
@@ -101,10 +121,7 @@ static Node *primary(Token **tok_loc) {
 	if (tok->kind == TK_IDENT) {
 		// Function call
 		if (equal(tok->next, "(")) {
-			Node *node = new_node(ND_FNCALL, tok);
-			node->fnname = strndup(tok->loc, tok->len);
-			*tok_loc = skip(tok->next->next, ")");
-			return node;
+			return fncall(tok_loc);
 		}
 
 		// Variable

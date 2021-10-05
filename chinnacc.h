@@ -96,6 +96,7 @@ struct Node {
 
 	// For Function calls
 	char *fnname;
+	Node *args;
 };
 
 typedef struct Function Function;

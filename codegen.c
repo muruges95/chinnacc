@@ -1,6 +1,8 @@
 #include "chinnacc.h"
 
 static int depth; // stack depth
+// conventional registers used for first 6 args of function in a fn call, in the correct order
+static char *argregs[] = { "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9" };
 
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
@@ -87,7 +89,16 @@ static void gen_expr(Node *node) {
 			printf("  mov %%rax, (%%rdi)\n"); // load rax into var addr in rdi
 			return;
 		case ND_FNCALL:
-			printf("  mov $0, %%rax\n");
+			int num_args = 0;
+			for (Node *arg = node->args; arg; arg = arg->next) {
+				gen_expr(arg);
+				push();
+				num_args++;
+			}
+			for (int i=num_args - 1; i >= 0; i--)
+				pop(argregs[i]);
+
+			// printf("  mov $0, %%rax\n"); // NOTE: find out reason for this line
 			printf("  call %s\n", node->fnname); // note requires fn to be defined somewhere
 			return;
 	}
