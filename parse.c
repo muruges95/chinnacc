@@ -86,6 +86,10 @@ static Node *stmt(Token **tok_loc);
 static Node *expr_stmt(Token **tok_loc);
 static Node *compound_stmt(Token **tok_loc);
 
+// FUNCTION SPECIFIC
+static Type *declspec(Token **tok_loc);
+static Type *declarator(Token **tok_loc, Type *type);
+
 // fncall -> ident "(" (assign ("," assign)*)? ")"
 static Node *fncall(Token **tok_loc) {
 	Token *tok = *tok_loc;
@@ -431,7 +435,17 @@ static Type *declspec(Token **tok_loc) {
 	return ty_int;
 }
 
-// declarator = "*"* ident
+// type suffix represents the types of the args in declaration
+// type-suffix = ("(" func-params)?
+static Type *type_suffix(Token **tok_loc, Type *ty) {
+	if (consume(tok_loc, "(")) {
+		*tok_loc = skip(*tok_loc, ")");
+		return fn_type(ty);
+	}
+	return ty;
+}
+
+// declarator = "*"* ident type-suffix
 static Type *declarator(Token **tok_loc, Type *ty) {
 	while (consume(tok_loc, "*"))
 		ty = pointer_to(ty);
@@ -440,9 +454,9 @@ static Type *declarator(Token **tok_loc, Type *ty) {
 
 	if (tok->kind != TK_IDENT)
 		error_tok(tok, "expected a variable name");
-
-	ty->name = tok;
 	*tok_loc = tok->next;
+	ty = type_suffix(tok_loc, ty);
+	ty->name = tok;
 	return ty;
 }
 
@@ -477,6 +491,22 @@ static Node *declaration(Token **tok_loc) {
 	return node;
 }
 
+static Function *function(Token **tok_loc) {
+	Type *ty = declspec(tok_loc);
+	ty = declarator(tok_loc, ty);
+
+	locals = NULL; // reset locals in function to null, and will be built up over succesive calls to append to the locals list
+
+	Function *fn = calloc(1, sizeof(Function));
+	fn->name = get_ident(ty->name);
+	*tok_loc = skip(*tok_loc, "{");
+
+	fn->body = compound_stmt(tok_loc);
+	fn->locals = locals;
+	fn->stack_size = 0;
+	return fn;
+}
+
 // expr-stmt -> expr? ";"
 static Node *expr_stmt(Token **tok_loc) {
 	Token *tok = *tok_loc;
@@ -491,11 +521,11 @@ static Node *expr_stmt(Token **tok_loc) {
 }
 
 // top level parsing translation scheme, equivalent to the following
-// program = stmt*
+// program = function-definition*
 Function *parse(Token *tok) {
-	tok = skip(tok, "{");
-	Function *prog = calloc(1, sizeof(Function));
-	prog->body = compound_stmt(&tok);
-	prog->locals = locals;
-	return prog;
+	Function head = {};
+	Function *curr = &head;
+	while (tok->kind != TK_EOF)
+		curr = curr->next = function(&tok);
+	return head.next;
 }

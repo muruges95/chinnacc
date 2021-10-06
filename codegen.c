@@ -1,8 +1,9 @@
 #include "chinnacc.h"
 
-static int depth; // stack depth
+static int depth = 0; // stack depth
 // conventional registers used for first 6 args of function in a fn call, in the correct order
 static char *argregs[] = { "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9" };
+static Function *current_fn; // stacktracee of fns to know where to jmp to
 
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
@@ -46,17 +47,19 @@ static void gen_addr_and_load(Node *node) {
 	error_tok(node->tok, "invalid expression");
 }
 
-// currently we assume that we have a single function and are assigning for
+// for each function we are calculating this for we are assigning for
 // all the local variables in it (in a single stack frame). We are traversing
-// the linked list of variables generated during parsing to do this
+// the linked list of variables generated during parsing to do this.
 static void assign_lvar_offsets(Function *prog) {
-	int offset = 0;
-	for (Obj *var = prog->locals; var; var = var->next) {
+	for (Function *fn = prog; fn; fn = fn->next) {
+		int offset = 0;
 		// for each we assign 8 bytes of space (sufficient for ints and longs)
-		offset += 8;
-		var->offset = -offset;
+		for (Obj *var = fn->locals; var; var = var->next) {
+			offset += 8;
+			var->offset = -offset;
+		}
+		fn->stack_size = align_to(offset, 16); // possibly a requirement for alignment purposes, need to check c/x64 docs
 	}
-	prog->stack_size = align_to(offset, 16); // possibly a requirement for alignment purposes, need to check c/x64 docs
 }
 
 // Gen code for an expression node
@@ -199,7 +202,7 @@ static void gen_stmt(Node *node) {
 			return;
 		case ND_RETURN:
 			gen_expr(node->lhs);
-			printf(  "jmp .L.return\n");
+			printf(  "jmp .L.return.%s\n", current_fn->name);
 			return;
 		case ND_EXPR_STMT:
 			gen_expr(node->lhs);
@@ -210,20 +213,23 @@ static void gen_stmt(Node *node) {
 
 void codegen(Function *prog) {
 	assign_lvar_offsets(prog);
-	printf("  .globl main\n");
-	printf("main:\n");
+	for (Function *fn = prog; fn; fn = fn->next) {
+		printf("  .globl %s\n", fn->name);
+		printf("%s:\n", fn->name);
+		current_fn = fn;
+		// Prologue
+		printf("  push %%rbp\n"); // save base pointer
+		printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
+		printf("  sub $%d, %%rsp\n", fn->stack_size); // allocate space for variables
 
-	// Prologue
-	printf("  push %%rbp\n"); // save base pointer
-	printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
-	printf("  sub $%d, %%rsp\n", prog->stack_size); // allocate space for variables
+		gen_stmt(fn->body);
+		assert(depth == 0);
 
-	gen_stmt(prog->body);
-	assert(depth == 0);
+		// epilogue
+		printf(".L.return.%s:\n", fn->name); // provide section to jump to for return stmts
+		printf("  mov %%rbp, %%rsp\n");
+		printf("  pop %%rbp\n");
+		printf("  ret\n");
+	}
 
-	// epilogue
-	printf(".L.return:\n"); // provide section to jump to for return stmts
-	printf("  mov %%rbp, %%rsp\n");
-	printf("  pop %%rbp\n");
-	printf("  ret\n");
 }

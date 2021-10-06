@@ -101,6 +101,8 @@ struct Node {
 
 typedef struct Function Function;
 struct Function {
+	Function *next;
+	char *name;
 	Node *body;
 	Obj *locals;
 	int stack_size;
@@ -113,12 +115,16 @@ Function *parse(Token *tok);
 typedef enum {
 	TY_INT,
 	TY_PTR,
+	TY_FN,
 } TypeKind;
 
 struct Type {
 	TypeKind kind;
 	// if ptr
 	Type *base;
+
+	// Function return type
+	Type *return_ty;
 
 	// storing the token where we do the type decl
 	Token *name;
@@ -128,6 +134,7 @@ extern Type *ty_int;
 
 bool is_integer(Type *ty);
 Type *pointer_to(Type *base);
+Type *fn_type(Type *return_ty);
 void add_type(Node *node);
 
 /** CODEGEN **/

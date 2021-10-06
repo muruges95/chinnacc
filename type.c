@@ -15,6 +15,13 @@ Type *pointer_to(Type *base) {
 	return ty;
 }
 
+Type *fn_type(Type *return_ty) {
+	Type *ty = calloc(1, sizeof(Type));
+	ty->kind = TY_FN;
+	ty->return_ty = return_ty;
+	return ty;
+}
+
 // recursively adding type to a node and its descendants
 void add_type(Node *node) {
 	if (!node || node->ty)
