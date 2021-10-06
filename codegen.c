@@ -88,7 +88,7 @@ static void gen_expr(Node *node) {
 			pop("%rdi"); // pop var address into rdi
 			printf("  mov %%rax, (%%rdi)\n"); // load rax into var addr in rdi
 			return;
-		case ND_FNCALL:
+		case ND_FNCALL: {
 			int num_args = 0;
 			for (Node *arg = node->args; arg; arg = arg->next) {
 				gen_expr(arg);
@@ -101,6 +101,7 @@ static void gen_expr(Node *node) {
 			// printf("  mov $0, %%rax\n"); // NOTE: find out reason for this line
 			printf("  call %s\n", node->fnname); // note requires fn to be defined somewhere
 			return;
+		}
 	}
 
 	// all other node types are binary
