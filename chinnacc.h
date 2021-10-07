@@ -103,6 +103,8 @@ typedef struct Function Function;
 struct Function {
 	Function *next;
 	char *name;
+	Obj *params;
+
 	Node *body;
 	Obj *locals;
 	int stack_size;
@@ -125,6 +127,8 @@ struct Type {
 
 	// Function return type
 	Type *return_ty;
+	Type *params;
+	Type *next;
 
 	// storing the token where we do the type decl
 	Token *name;
@@ -134,6 +138,7 @@ extern Type *ty_int;
 
 bool is_integer(Type *ty);
 Type *pointer_to(Type *base);
+Type *copy_type(Type *ty);
 Type *fn_type(Type *return_ty);
 void add_type(Node *node);
 

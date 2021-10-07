@@ -202,7 +202,7 @@ static void gen_stmt(Node *node) {
 			return;
 		case ND_RETURN:
 			gen_expr(node->lhs);
-			printf(  "jmp .L.return.%s\n", current_fn->name);
+			printf("  jmp .L.return.%s\n", current_fn->name);
 			return;
 		case ND_EXPR_STMT:
 			gen_expr(node->lhs);
@@ -221,7 +221,12 @@ void codegen(Function *prog) {
 		printf("  push %%rbp\n"); // save base pointer
 		printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
 		printf("  sub $%d, %%rsp\n", fn->stack_size); // allocate space for variables
+		int i = 0;
+		for (Obj *var = fn->params; var; var = var->next)
+			printf("  mov %s, %d(%%rbp)\n", argregs[i++], var->offset);
 
+
+		// emit code for each function
 		gen_stmt(fn->body);
 		assert(depth == 0);
 

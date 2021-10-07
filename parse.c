@@ -436,11 +436,22 @@ static Type *declspec(Token **tok_loc) {
 }
 
 // type suffix represents the types of the args in declaration
-// type-suffix = ("(" func-params)?
+// type-suffix	-> ("(" func-params? ")")?
+// func-params	-> param ("," param)*
+// param		-> declspec declarator
 static Type *type_suffix(Token **tok_loc, Type *ty) {
 	if (consume(tok_loc, "(")) {
-		*tok_loc = skip(*tok_loc, ")");
-		return fn_type(ty);
+		Type head = {};
+		Type *curr = &head;
+		while (!consume(tok_loc, ")")) {
+			if (&head != curr)
+				*tok_loc = skip(*tok_loc, ",");
+			Type *basety = declspec(tok_loc);
+			Type *ty = declarator(tok_loc, basety);
+			curr = curr->next = copy_type(ty);
+		}
+		ty = fn_type(ty);
+		ty->params = head.next;
 	}
 	return ty;
 }
@@ -491,6 +502,15 @@ static Node *declaration(Token **tok_loc) {
 	return node;
 }
 
+static void create_param_lvars(Type *param) {
+	if (param) {
+		create_param_lvars(param->next); // creating lvars (objs) in reverse order
+		// so that when read from the head of stack, encountered in order in code
+
+		new_lvar(get_ident(param->name), param);
+	}
+}
+
 static Function *function(Token **tok_loc) {
 	Type *ty = declspec(tok_loc);
 	ty = declarator(tok_loc, ty);
@@ -499,6 +519,8 @@ static Function *function(Token **tok_loc) {
 
 	Function *fn = calloc(1, sizeof(Function));
 	fn->name = get_ident(ty->name);
+	create_param_lvars(ty->params);
+	fn->params = locals;
 	*tok_loc = skip(*tok_loc, "{");
 
 	fn->body = compound_stmt(tok_loc);
