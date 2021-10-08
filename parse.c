@@ -214,7 +214,6 @@ static Node *relational(Token **tok_loc) {
 
 // Implementation of the overloaded add and subtract operators
 // for these, we need to do early type inference to know how to deal with the ops
-// we are currently mul/div by 8 because that is the int size but this needs to eventually change to the size of the base types of the ptrs
 static Node *new_add_node(Node *lhs, Node *rhs, Token *tok) {
 	add_type(lhs);
 	add_type(rhs);
@@ -237,7 +236,7 @@ static Node *new_add_node(Node *lhs, Node *rhs, Token *tok) {
 	}
 
 	// ptr + num
-	rhs = new_binary_node(ND_MUL, rhs, new_numeric_node(8, tok), tok);
+	rhs = new_binary_node(ND_MUL, rhs, new_numeric_node(lhs->ty->base->size, tok), tok);
 	return new_binary_node(ND_ADD, lhs, rhs, tok);
 }
 
@@ -254,7 +253,7 @@ static Node *new_sub_node(Node *lhs, Node *rhs, Token *tok) {
 
 	// in case of ptr - num
 	if (lhs->ty->base && is_integer(rhs->ty)) {
-		rhs = new_binary_node(ND_MUL, rhs, new_numeric_node(8, tok), tok);
+		rhs = new_binary_node(ND_MUL, rhs, new_numeric_node(lhs->ty->base->size, tok), tok);
 		return new_binary_node(ND_SUB, lhs, rhs, tok);
 	}
 
@@ -262,7 +261,7 @@ static Node *new_sub_node(Node *lhs, Node *rhs, Token *tok) {
 	if (lhs->ty->base && rhs->ty->base) {
 		Node *node = new_binary_node(ND_SUB, lhs, rhs, tok);
 		node->ty = ty_int;
-		return new_binary_node(ND_DIV, node, new_numeric_node(8, tok), tok);
+		return new_binary_node(ND_DIV, node, new_numeric_node(lhs->ty->base->size, tok), tok);
 	}
 
 	error_tok(tok, "invalid operand types");
@@ -429,29 +428,47 @@ static Node *compound_stmt(Token **tok_loc) {
 
 // declaration and helper fns
 
+// a version of the 'skip' helper fn that allows us to expect for any number and throw an error if not one
+static int get_number(Token *tok) {
+	if (tok->kind != TK_NUM)
+		error_tok(tok, "expected a number");
+	return tok->val;
+}
+
 // declspec = "int"
 static Type *declspec(Token **tok_loc) {
 	*tok_loc = skip(*tok_loc, "int");
 	return ty_int;
 }
 
-// type suffix represents the types of the args in declaration
-// type-suffix	-> ("(" func-params? ")")?
-// func-params	-> param ("," param)*
+// func-params	-> (param ("," param)*)? ")"
 // param		-> declspec declarator
+static Type *func_params(Token **tok_loc, Type *ty) {
+	Type head = {};
+	Type *curr = &head;
+	while (!consume(tok_loc, ")")) {
+		if (&head != curr)
+			*tok_loc = skip(*tok_loc, ",");
+		Type *basety = declspec(tok_loc);
+		Type *ty = declarator(tok_loc, basety);
+		curr = curr->next = copy_type(ty);
+	}
+	ty = fn_type(ty);
+	ty->params = head.next;
+	return ty;
+}
+
+// type suffix represents whatever comes lexically after the declared name
+// type-suffix	-> "(" func-params
+//				 | "[" num "]"
+//				 | ε
 static Type *type_suffix(Token **tok_loc, Type *ty) {
-	if (consume(tok_loc, "(")) {
-		Type head = {};
-		Type *curr = &head;
-		while (!consume(tok_loc, ")")) {
-			if (&head != curr)
-				*tok_loc = skip(*tok_loc, ",");
-			Type *basety = declspec(tok_loc);
-			Type *ty = declarator(tok_loc, basety);
-			curr = curr->next = copy_type(ty);
-		}
-		ty = fn_type(ty);
-		ty->params = head.next;
+	if (consume(tok_loc, "("))
+		return func_params(tok_loc, ty);
+	if (consume(tok_loc, "[")) {
+		int array_size = get_number(*tok_loc); // to be determined at compile time
+		*tok_loc = skip((*tok_loc)->next, "]");
+		return arr_of(ty, array_size);
 	}
 	return ty;
 }

@@ -118,17 +118,25 @@ typedef enum {
 	TY_INT,
 	TY_PTR,
 	TY_FN,
+	TY_ARR,
 } TypeKind;
 
 struct Type {
 	TypeKind kind;
-	// if ptr
+
+	int size; 	// sizeof value
+
+	// represents either pointer to or array of, as they are treated similarly
+	// this is why we can treat ptrs and arrays similarly by checking on this base var instead of the 'kind' field
 	Type *base;
 
 	// Function return type
 	Type *return_ty;
 	Type *params;
 	Type *next;
+
+	// for arrays only
+	int array_len;
 
 	// storing the token where we do the type decl
 	Token *name;
@@ -140,6 +148,7 @@ bool is_integer(Type *ty);
 Type *pointer_to(Type *base);
 Type *copy_type(Type *ty);
 Type *fn_type(Type *return_ty);
+Type *arr_of(Type *base, int size);
 void add_type(Node *node);
 
 /** CODEGEN **/

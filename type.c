@@ -2,7 +2,7 @@
 
 // purpose of this file is to implement a basic type inference system to determine which versions of operators we are using (in the case of overloaded operators)
 
-Type *ty_int = &(Type){TY_INT}; // address of obj typecasted to Type
+Type *ty_int = &(Type){TY_INT, 8}; // address of obj typecasted to Type
 
 bool is_integer(Type *ty) {
 	return ty->kind == TY_INT;
@@ -11,8 +11,17 @@ bool is_integer(Type *ty) {
 Type *pointer_to(Type *base) {
 	Type *ty = calloc(1, sizeof(Type));
 	ty->kind = TY_PTR;
+	ty->size = 8;
 	ty->base = base;
 	return ty;
+}
+
+Type *arr_of(Type *base, int size) {
+	Type *ty = calloc(1, sizeof(Type));
+	ty->kind = TY_ARR;
+	ty->size = 8 * size;
+	ty->base = base;
+	ty->array_len = size;
 }
 
 Type *fn_type(Type *return_ty) {
@@ -54,8 +63,12 @@ void add_type(Node *node) {
 		case ND_MUL:
 		case ND_DIV:
 		case ND_NEG:
-		case ND_ASSIGN:
 			// for these cases infer type based on child nodes
+			node->ty = node->lhs->ty;
+			return;
+		case ND_ASSIGN:
+			if (node->lhs->ty->kind == TY_ARR)
+				error_tok(node->lhs->tok, "not an lval");
 			node->ty = node->lhs->ty;
 			return;
 		case ND_EQ:
@@ -70,10 +83,16 @@ void add_type(Node *node) {
 			node->ty = node->var->ty;
 			return;
 		case ND_ADDR:
-			node->ty = pointer_to(node->lhs->ty);
+			if (node->lhs->ty->kind == TY_ARR)
+				// In this case a array var is an alias of its address (simply put)
+				// thats why it has the same type as a pointer of the base type of the
+				// arr instead of a double ptr
+				node->ty = pointer_to(node->lhs->ty->base);
+			else
+				node->ty = pointer_to(node->lhs->ty);
 			return;
 		case ND_DEREF:
-			if (node->lhs->ty->kind != TY_PTR)
+			if (!node->lhs->ty->base) // not ptr nor arr
 				error_tok(node->tok, "invalid pointer dereference");
 			node->ty = node->lhs->ty->base;
 			return;

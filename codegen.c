@@ -33,8 +33,6 @@ static int align_to(int n, int align) {
 // compute the absolute address of a given node and loads it into %rax
 // Gives an error if a given node does not reside in memory (i.e. not an lval)
 static void gen_addr_and_load(Node *node) {
-	if (node->kind == ND_VAR) {
-	}
 	switch (node->kind) {
 		case ND_VAR:
 			printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
@@ -47,19 +45,17 @@ static void gen_addr_and_load(Node *node) {
 	error_tok(node->tok, "invalid expression");
 }
 
-// for each function we are calculating this for we are assigning for
-// all the local variables in it (in a single stack frame). We are traversing
-// the linked list of variables generated during parsing to do this.
-static void assign_lvar_offsets(Function *prog) {
-	for (Function *fn = prog; fn; fn = fn->next) {
-		int offset = 0;
-		// for each we assign 8 bytes of space (sufficient for ints and longs)
-		for (Obj *var = fn->locals; var; var = var->next) {
-			offset += 8;
-			var->offset = -offset;
-		}
-		fn->stack_size = align_to(offset, 16); // possibly a requirement for alignment purposes, need to check c/x64 docs
-	}
+// Load a value from where %rax is pointing to
+static void load(Type *ty) {
+	// in this case, we treat the arr as a pointer to the first ele in the array
+	if (ty->kind == TY_ARR)
+		return; // do nothing as address is already in rax
+	printf("  mov (%%rax), %%rax\n");
+}
+
+static void store(void) {
+	pop("%rdi\n"); // store top of stack into temp reg
+	printf("  mov %%rax, (%%rdi)\n"); // store val from reg into addr held in temp reg
 }
 
 // Gen code for an expression node
@@ -75,11 +71,11 @@ static void gen_expr(Node *node) {
 		case ND_VAR:
 			gen_addr_and_load(node);
 			// deref addr in rax and store val back in rax
-			printf("  mov (%%rax), %%rax\n");
+			load(node->ty);
 			return;
 		case ND_DEREF:
 			gen_expr(node->lhs);
-			printf("  mov (%%rax), %%rax\n");
+			load(node->ty);
 			return;
 		case ND_ADDR:
 			gen_addr_and_load(node->lhs);
@@ -88,8 +84,7 @@ static void gen_expr(Node *node) {
 			gen_addr_and_load(node->lhs);
 			push(); // push var addr into stack
 			gen_expr(node->rhs);
-			pop("%rdi"); // pop var address into rdi
-			printf("  mov %%rax, (%%rdi)\n"); // load rax into var addr in rdi
+			store(); // store val in rax into addr at top of stack
 			return;
 		case ND_FNCALL: {
 			int num_args = 0;
@@ -209,6 +204,20 @@ static void gen_stmt(Node *node) {
 			return;
 	}
 	error_tok(node->tok, "invalid statement");
+}
+
+// for each function we are calculating this for we are assigning for
+// all the local variables in it (in a single stack frame). We are traversing
+// the linked list of variables generated during parsing to do this.
+static void assign_lvar_offsets(Function *prog) {
+	for (Function *fn = prog; fn; fn = fn->next) {
+		int offset = 0;
+		for (Obj *var = fn->locals; var; var = var->next) {
+			offset += var->ty->size;
+			var->offset = -offset;
+		}
+		fn->stack_size = align_to(offset, 16); // possibly a requirement for alignment purposes, need to check c/x64 docs
+	}
 }
 
 void codegen(Function *prog) {
