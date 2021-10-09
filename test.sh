@@ -133,8 +133,34 @@ assert 3 'int main() { int x[2][3]; int *y=x; *(y+3)=3; return **(x+1); }'
 assert 4 'int main() { int x[2][3]; int *y=x; *(y+4)=4; return *(*(x+1)+1); }'
 assert 5 'int main() { int x[2][3]; int *y=x; *(y+5)=5; return *(*(x+1)+2); }'
 
+assert 3 'int main() { int x[3]; *x=3; x[1]=4; x[2]=5; return *x; }'
+assert 4 'int main() { int x[3]; *x=3; x[1]=4; x[2]=5; return *(x+1); }'
+assert 5 'int main() { int x[3]; *x=3; x[1]=4; x[2]=5; return *(x+2); }'
+assert 5 'int main() { int x[3]; *x=3; x[1]=4; x[2]=5; return *(x+2); }'
+assert 5 'int main() { int x[3]; *x=3; x[1]=4; 2[x]=5; return *(x+2); }'
+
+assert 0 'int main() { int x[2][3]; int *y=x; y[0]=0; return x[0][0]; }'
+assert 1 'int main() { int x[2][3]; int *y=x; y[1]=1; return x[0][1]; }'
+assert 2 'int main() { int x[2][3]; int *y=x; y[2]=2; return x[0][2]; }'
+assert 3 'int main() { int x[2][3]; int *y=x; y[3]=3; return x[1][0]; }'
+assert 4 'int main() { int x[2][3]; int *y=x; y[4]=4; return x[1][1]; }'
+assert 5 'int main() { int x[2][3]; int *y=x; y[5]=5; return x[1][2]; }'
+
+assert 8 'int main() { int x; return sizeof(x); }'
+assert 8 'int main() { int x; return sizeof x; }'
+assert 8 'int main() { int *x; return sizeof(x); }'
+assert 32 'int main() { int x[4]; return sizeof(x); }'
+assert 96 'int main() { int x[3][4]; return sizeof(x); }'
+assert 32 'int main() { int x[3][4]; return sizeof(*x); }'
+assert 8 'int main() { int x[3][4]; return sizeof(**x); }'
+assert 9 'int main() { int x[3][4]; return sizeof(**x) + 1; }'
+assert 9 'int main() { int x[3][4]; return sizeof **x + 1; }'
+assert 8 'int main() { int x[3][4]; return sizeof(**x + 1); }'
+assert 8 'int main() { int x=1; return sizeof(x=2); }'
+assert 1 'int main() { int x=1; sizeof(x=2); return x; }'
+
 # note that both variables out of block scope and matching the variable signature are not checked for in chinnacc currently. However, function scope is still being respected
 
-echo "Tests passed: $test_passed/75"
+echo "Tests passed: $test_passed/104"
 
 echo OK

@@ -78,6 +78,7 @@ static Node *relational(Token **tok_loc);
 static Node *add(Token **tok_loc);
 static Node *mul(Token **tok_loc);
 static Node *unary(Token **tok_loc);
+static Node *postfix(Token **tok_loc);
 static Node *primary(Token **tok_loc);
 
 // STATEMENTS
@@ -316,7 +317,8 @@ static Node *mul(Token **tok_loc) {
 }
 
 // unary, next precedence level
-// Translation scheme: unary -> primary | "+" unary | "-" unary | "*" unary | "&" unary
+// Translation scheme: unary -> postfix | "+" unary | "-" unary | "*" unary | "&" unary
+// 							  | "sizeof" unary
 // In this case the handling is slightly diff for all 3 cases
 
 static Node *unary(Token **tok_loc) {
@@ -334,8 +336,29 @@ static Node *unary(Token **tok_loc) {
 	if (consume(tok_loc, "*")) {
 		return new_unary_node(ND_DEREF, unary(tok_loc), tok);
 	}
+	if (consume(tok_loc, "sizeof")) {
+		*tok_loc = tok->next;
+		Node *node = unary(tok_loc); // we choose unary and not expr as we would want to treat say sizeof x + 1 as (sizeof x) + 1
+		add_type(node);
+		return new_numeric_node(node->ty->size, tok);
+	}
 
-	return primary(tok_loc);
+	return postfix(tok_loc);
+}
+
+// postfix -> primary ("[" expr "]")*
+static Node *postfix(Token **tok_loc) {
+	Node *node = primary(tok_loc);
+
+	while (equal(*tok_loc, "[")) {
+		Token *tok = *tok_loc;
+		*tok_loc = tok->next;
+		node = new_add_node(node, expr(tok_loc), tok);
+		node = new_unary_node(ND_DEREF, node, tok);
+		*tok_loc = skip(*tok_loc, "]");
+	}
+
+	return node;
 }
 
 // stmt -> "return" expr ";" // we dont use expr-stmt as what we want to return is just the expr, so that should be the child node
