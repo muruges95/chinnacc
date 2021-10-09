@@ -460,7 +460,7 @@ static Type *func_params(Token **tok_loc, Type *ty) {
 
 // type suffix represents whatever comes lexically after the declared name
 // type-suffix	-> "(" func-params
-//				 | "[" num "]"
+//				 | "[" num "]" type-suffix  // note that this is a recursive def
 //				 | ε
 static Type *type_suffix(Token **tok_loc, Type *ty) {
 	if (consume(tok_loc, "("))
@@ -468,6 +468,7 @@ static Type *type_suffix(Token **tok_loc, Type *ty) {
 	if (consume(tok_loc, "[")) {
 		int array_size = get_number(*tok_loc); // to be determined at compile time
 		*tok_loc = skip((*tok_loc)->next, "]");
+		ty = type_suffix(tok_loc, ty);
 		return arr_of(ty, array_size);
 	}
 	return ty;

@@ -11,7 +11,7 @@ bool is_integer(Type *ty) {
 Type *pointer_to(Type *base) {
 	Type *ty = calloc(1, sizeof(Type));
 	ty->kind = TY_PTR;
-	ty->size = 8;
+	ty->size = 8; // hardcoded size of pointer
 	ty->base = base;
 	return ty;
 }
@@ -19,9 +19,10 @@ Type *pointer_to(Type *base) {
 Type *arr_of(Type *base, int size) {
 	Type *ty = calloc(1, sizeof(Type));
 	ty->kind = TY_ARR;
-	ty->size = 8 * size;
+	ty->size = base->size * size;
 	ty->base = base;
 	ty->array_len = size;
+	return ty;
 }
 
 Type *fn_type(Type *return_ty) {
