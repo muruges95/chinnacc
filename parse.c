@@ -1,4 +1,5 @@
 #include "chinnacc.h"
+#include <stdio.h>
 
 // All local variable instances created during parsing are stored in a linked list
 static Obj *locals; // stack DS
@@ -61,6 +62,30 @@ static Obj *new_gvar(char *name, Type *ty) {
 	Obj *var = new_var(name, ty);
 	var->next = globals;
 	globals = var;
+	return var;
+}
+
+// create a unique name for objects create for literals
+static char *gen_unique_name() {
+	static int curr_id = 0;
+	char *buf = calloc(1, 20); // 4 char for the leading, 15 for the remaining
+	// 2**10 is slightly more than 10**3. Ints are either 2 or 4 bytes wide (need to verify) so max size is
+	// roughly 2**32, which is roughly 10 digits, so no issue of overflow unless the size of ints change
+	// in the future, though it would still be extremely difficult to trigger this condition (need to have
+	// more than a quadrillion variables (10**15++))...
+	sprintf(buf, ".L..%d", curr_id++);
+	return buf; 
+}
+
+// anonymous version of new_gvar for creating literals that require
+static Obj *new_anon_gvar(Type *ty) {
+	return new_gvar(gen_unique_name(), ty);
+}
+
+// is implemented as defining an anonymous global variable with a special field to point to the start of the string
+static Obj *new_string_literal(char *p, Type *ty) {
+	Obj *var = new_anon_gvar(ty);
+	var->init_data = p;
 	return var;
 }
 
@@ -135,7 +160,7 @@ static Node *fncall(Token **tok_loc) {
 
 // primary: the units that are unbreakable, start with this,
 // will also include the non-terminal involved in the lowest precedence ops
-// Translation scheme: primary -> "(" expr ")" | ident fn-args? | num
+// Translation scheme: primary -> "(" expr ")" | ident fn-args? | str | num
 // Note that fncall handling is done separately
 static Node *primary(Token **tok_loc) {
 	if (consume(tok_loc, "(")) {
@@ -157,6 +182,12 @@ static Node *primary(Token **tok_loc) {
 		if (!var) {
 			error_tok(tok, "undefined variable");
 		}
+		*tok_loc = tok->next;
+		return new_var_node(var, tok);
+	}
+
+	if (tok->kind == TK_STR) {
+		Obj *var = new_string_literal(tok->str, tok->ty);
 		*tok_loc = tok->next;
 		return new_var_node(var, tok);
 	}

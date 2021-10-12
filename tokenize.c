@@ -110,6 +110,20 @@ static bool is_keyword(Token *tok) {
 	return false;
 }
 
+static Token *read_string_literal(char *start) {
+	char *p = start + 1;
+	// terminate once we reach the closing double quotation char
+	for (; *p != '"'; p++) {
+		// single line string literals cannot contain these two chars
+		if (*p == '\n' || *p == '\0') 
+			error_at(start, "unclosed string literal");
+	}
+	Token *tok = new_token(TK_STR, start, p + 1);
+	tok->ty = arr_of(ty_char, p - start); // we need to factor in the null char at the end
+	tok->str = strndup(start + 1, p - start - 1); // dont need to factor in as fn null terms it
+	return tok;
+}
+
 // Do one pass to convert tokens containing keywords (classified as identifiers) into keyword type tokens
 static void convert_keywords(Token *tok) {
 	for (Token *t = tok; t; t = t->next) {
@@ -141,6 +155,13 @@ Token *tokenize(char *p) {
 			curr->val = strtoul(p, &p, 10); // max we can read in is 1 ul worth of digits, also cant read in hexa or octa digits
 			// strtoul also advances pointer p to after the number ends
 			curr->len = p - start;
+			continue;
+		}
+
+		// string literal
+		if (*p == '"') {
+			curr = curr->next = read_string_literal(p);
+			p += curr->len;
 			continue;
 		}
 

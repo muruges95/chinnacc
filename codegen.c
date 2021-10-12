@@ -247,7 +247,13 @@ static void emit_data(Obj *prog) {
 		printf("  .data\n");
 		printf("  .globl %s\n", var->name);
 		printf("%s:\n", var->name);
-		printf("  .zero %d\n", var->ty->size);
+
+		// one of those anonymous global vars used for string literals
+		if (var->init_data) {
+			for (int i = 0; i < var->ty->size; i++)
+				printf("  .byte %d\n", var->init_data[i]); // print char by char in numerical fmt
+		} else
+			printf("  .zero %d\n", var->ty->size);
 	}
 }
 

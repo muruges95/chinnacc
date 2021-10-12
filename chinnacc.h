@@ -15,6 +15,7 @@ typedef enum {
 	TK_PUNCT,	// Punctuators
 	TK_IDENT,	// Identifiers
 	TK_NUM,		// Numeric literals
+	TK_STR,		// String literals
 	TK_KEYWORD,	// Keywords
 	TK_EOF,		// End of file markers
 } TokenKind;
@@ -27,6 +28,10 @@ struct Token {
 	int val;		// if numeric token, its value
 	char *loc;		// Token location
 	int len;		// Token length
+
+	// strings
+	Type *ty;		// used only for strings
+	char *str;		// string value
 };
 
 Token *tokenize(char *p);
@@ -72,6 +77,9 @@ struct Obj {
 	int offset;		// offset from rbp (position within stack frame)
 
 	bool is_function; // to distinguish btween global var and fn
+
+	// Only for global variables
+	char *init_data;
 
 	// Only for functions
 	Obj *params;

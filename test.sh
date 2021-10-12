@@ -179,8 +179,17 @@ assert 1 'int main() { char x; return sizeof(x); }'
 assert 10 'int main() { char x[10]; return sizeof(x); }'
 assert 1 'int main() { return sub_char(7, 3, 3); } int sub_char(char a, char b, char c) { return a-b-c; }'
 
+assert 0 'int main() { return ""[0]; }'
+assert 1 'int main() { return sizeof(""); }'
+
+assert 97 'int main() { return "abc"[0]; }'
+assert 98 'int main() { return "abc"[1]; }'
+assert 99 'int main() { return "abc"[2]; }'
+assert 0 'int main() { return "abc"[3]; }'
+assert 4 'int main() { return sizeof("abc"); }'
+
 # note that both variables out of block scope and matching the variable signature are not checked for in chinnacc currently. However, function scope is still being respected
 
-echo "Tests passed: $test_passed/114"
+echo "Tests passed: $test_passed/127"
 
 echo OK
