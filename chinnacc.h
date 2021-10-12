@@ -56,17 +56,29 @@ typedef enum {
 	ND_EXPR_STMT	// expr;
 } NodeKind;
 
-// Local variable
+// Variables and Functions
 typedef struct Obj Obj;
-struct Obj {
-	Obj *next;	// we store all variables in a linked list for access
-	char *name;	// var name
-	Type *ty;	// Type
-	int offset;	// offset from rbp (position within stack frame)
-};
 
 // AST node type
 typedef struct Node Node;
+
+struct Obj {
+	Obj *next;		// we store all variables in a linked list for access
+	char *name;		// var name
+	Type *ty;		// Type
+	bool is_local;	// Is local variable (vs global var/function)
+
+	// Only for local variables
+	int offset;		// offset from rbp (position within stack frame)
+
+	bool is_function; // to distinguish btween global var and fn
+
+	// Only for functions
+	Obj *params;
+	Node *body;
+	Obj *locals;
+	int stack_size;
+};
 
 // node data stuct is a mix of a tree and a linked list struct
 struct Node {
@@ -99,18 +111,7 @@ struct Node {
 	Node *args;
 };
 
-typedef struct Function Function;
-struct Function {
-	Function *next;
-	char *name;
-	Obj *params;
-
-	Node *body;
-	Obj *locals;
-	int stack_size;
-};
-
-Function *parse(Token *tok);
+Obj *parse(Token *tok);
 
 // Node type fns
 
@@ -152,7 +153,7 @@ Type *arr_of(Type *base, int size);
 void add_type(Node *node);
 
 /** CODEGEN **/
-void codegen(Function *prog);
+void codegen(Obj *prog);
 
 /** UTILITY FNS **/
 
@@ -165,4 +166,3 @@ bool consume(Token **tok_loc, char *str);
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
-

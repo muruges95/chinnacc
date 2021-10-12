@@ -1,7 +1,8 @@
 #include "chinnacc.h"
 
 // All local variable instances created during parsing are stored in a linked list
-Obj *locals; // stack DS
+static Obj *locals; // stack DS
+static Obj *globals; // all global vars and functions
 
 static Node *new_node(NodeKind kind, Token *tok) {
 	Node *node = calloc(1, sizeof(Node));
@@ -37,14 +38,29 @@ static Node *new_var_node(Obj *var, Token *tok) {
 	return node;
 }
 
-// creates an Obj, meant for lvalues
-static Obj *new_lvar(char *name, Type *ty) {
+// creates an object for variables / functions
+static Obj *new_var(char *name, Type *ty) {
 	Obj *var = calloc(1, sizeof(Obj));
 	var->name = name;
 	var->ty = ty;
+	return var;
+}
+
+// creating a local variable
+static Obj *new_lvar(char *name, Type *ty) {
+	Obj *var = new_var(name, ty);
+	var->is_local = true;
 	var->next = locals; // add to top of locals stack
 	locals = var;
 	// note offset not set here
+	return var;
+}
+
+// creating a global var or function
+static Obj *new_gvar(char *name, Type *ty) {
+	Obj *var = new_var(name, ty);
+	var->next = globals;
+	globals = var;
 	return var;
 }
 
@@ -552,14 +568,14 @@ static void create_param_lvars(Type *param) {
 	}
 }
 
-static Function *function(Token **tok_loc) {
-	Type *ty = declspec(tok_loc);
-	ty = declarator(tok_loc, ty);
+static void *function(Token **tok_loc, Type *basety) {
+	Type *ty = declarator(tok_loc, basety);
+
+	Obj *fn = new_gvar(get_ident(ty->name), ty);
+	fn->is_function = true;
 
 	locals = NULL; // reset locals in function to null, and will be built up over succesive calls to append to the locals list
 
-	Function *fn = calloc(1, sizeof(Function));
-	fn->name = get_ident(ty->name);
 	create_param_lvars(ty->params);
 	fn->params = locals;
 	*tok_loc = skip(*tok_loc, "{");
@@ -567,7 +583,6 @@ static Function *function(Token **tok_loc) {
 	fn->body = compound_stmt(tok_loc);
 	fn->locals = locals;
 	fn->stack_size = 0;
-	return fn;
 }
 
 // expr-stmt -> expr? ";"
@@ -585,10 +600,11 @@ static Node *expr_stmt(Token **tok_loc) {
 
 // top level parsing translation scheme, equivalent to the following
 // program = function-definition*
-Function *parse(Token *tok) {
-	Function head = {};
-	Function *curr = &head;
-	while (tok->kind != TK_EOF)
-		curr = curr->next = function(&tok);
-	return head.next;
+Obj *parse(Token *tok) {
+	globals = NULL;
+	while (tok->kind != TK_EOF) {
+		Type *basety = declspec(&tok);
+		function(&tok, basety);
+	}
+	return globals;
 }
