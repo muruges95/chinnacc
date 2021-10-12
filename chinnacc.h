@@ -116,6 +116,7 @@ Obj *parse(Token *tok);
 // Node type fns
 
 typedef enum {
+	TY_CHAR,
 	TY_INT,
 	TY_PTR,
 	TY_FN,
@@ -143,6 +144,9 @@ struct Type {
 	Token *name;
 };
 
+// default type objects for elementary types, so we dont need to keep recreating it
+// think of a singleton in OOP?
+extern Type *ty_char;
 extern Type *ty_int;
 
 bool is_integer(Type *ty);

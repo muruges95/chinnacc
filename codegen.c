@@ -2,7 +2,8 @@
 
 static int depth = 0; // stack depth
 // conventional registers used for first 6 args of function in a fn call, in the correct order
-static char *argregs[] = { "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9" };
+static char *argregs8[] = { "%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b" };
+static char *argregs64[] = { "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9" };
 static Obj *current_fn; // stacktracee of fns to know where to jmp to
 
 static void gen_expr(Node *node);
@@ -56,12 +57,20 @@ static void load(Type *ty) {
 	// in this case, we treat the arr as a pointer to the first ele in the array
 	if (ty->kind == TY_ARR)
 		return; // do nothing as address is already in rax
-	printf("  mov (%%rax), %%rax\n");
+	
+	if (ty->size == 1) // char type
+		printf("  movsbq (%%rax), %%rax\n");
+	else
+		printf("  mov (%%rax), %%rax\n");
 }
 
-static void store(void) {
+// type of store function dependent on type
+static void store(Type *ty) {
 	pop("%rdi\n"); // store top of stack into temp reg
-	printf("  mov %%rax, (%%rdi)\n"); // store val from reg into addr held in temp reg
+	if (ty->size == 1)
+		printf("  mov %%al, (%%rdi)\n");
+	else
+		printf("  mov %%rax, (%%rdi)\n"); // store val from reg into addr held in temp reg
 }
 
 // Gen code for an expression node
@@ -90,7 +99,7 @@ static void gen_expr(Node *node) {
 			gen_addr_and_load(node->lhs);
 			push(); // push var addr into stack
 			gen_expr(node->rhs);
-			store(); // store val in rax into addr at top of stack
+			store(node->ty); // store val in rax into addr at top of stack
 			return;
 		case ND_FNCALL: {
 			int num_args = 0;
@@ -99,8 +108,9 @@ static void gen_expr(Node *node) {
 				push();
 				num_args++;
 			}
+			// note the reverse order as we are popping from a stack
 			for (int i=num_args - 1; i >= 0; i--)
-				pop(argregs[i]);
+				pop(argregs64[i]); // find out if this is always the case or can pop out to lsb's only
 
 			// printf("  mov $0, %%rax\n"); // NOTE: find out reason for this line
 			printf("  call %s\n", node->fnname); // note requires fn to be defined somewhere
@@ -255,9 +265,12 @@ static void emit_text(Obj *prog) {
 		printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
 		printf("  sub $%d, %%rsp\n", fn->stack_size); // allocate space for variables
 		int i = 0;
-		for (Obj *var = fn->params; var; var = var->next)
-			printf("  mov %s, %d(%%rbp)\n", argregs[i++], var->offset);
-
+		for (Obj *var = fn->params; var; var = var->next) {
+			if (var->ty->size == 1)
+				printf("  mov %s, %d(%%rbp)\n", argregs8[i++], var->offset);
+			else
+				printf("  mov %s, %d(%%rbp)\n", argregs64[i++], var->offset);
+		}
 
 		// emit code for each function
 		gen_stmt(fn->body);

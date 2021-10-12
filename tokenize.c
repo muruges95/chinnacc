@@ -99,7 +99,7 @@ static int read_punct(char *p) {
 
 static bool is_keyword(Token *tok) {
 	static char *keyword_list[] = {
-		"return", "if", "else", "for", "while", "do", "int", "sizeof"
+		"return", "if", "else", "for", "while", "do", "int", "sizeof", "char"
 	};
 	// using size of instead of the list size to accomodate growth in list easily
 	for (int i=0; i < sizeof(keyword_list) / sizeof(*keyword_list); i++) {

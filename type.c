@@ -2,10 +2,11 @@
 
 // purpose of this file is to implement a basic type inference system to determine which versions of operators we are using (in the case of overloaded operators)
 
+Type *ty_char = &(Type){TY_CHAR, 1}; // is 1 by definition of sizeof
 Type *ty_int = &(Type){TY_INT, 8}; // address of obj typecasted to Type
 
 bool is_integer(Type *ty) {
-	return ty->kind == TY_INT;
+	return ty->kind == TY_CHAR || ty->kind == TY_INT;
 }
 
 Type *pointer_to(Type *base) {

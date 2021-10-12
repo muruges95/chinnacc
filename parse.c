@@ -467,13 +467,18 @@ static Node *expr_stmt(Token **tok_loc) {
 	return node;
 }
 
+// helper to see if tok stream is currently at a typename token
+static bool is_typename(Token *tok) {
+	return equal(tok, "char") || equal(tok, "int");
+}
+
 // compound-stmt -> (declaration | stmt)* "}"
 static Node *compound_stmt(Token **tok_loc) {
 	Node head = {};
 	Node *body_node = &head;
 	Node *node = new_node(ND_BLOCK, *tok_loc);
 	while (!equal(*tok_loc, "}")) {
-		if (equal(*tok_loc, "int"))
+		if (is_typename(*tok_loc))
 			body_node = body_node->next = declaration(tok_loc);
 		else
 			body_node = body_node->next = stmt(tok_loc);
@@ -493,8 +498,11 @@ static int get_number(Token *tok) {
 	return tok->val;
 }
 
-// declspec = "int"
+// declspec = "char" | "int"
 static Type *declspec(Token **tok_loc) {
+	if (consume(tok_loc, "char")) {
+		return ty_char;
+	}
 	*tok_loc = skip(*tok_loc, "int");
 	return ty_int;
 }
