@@ -159,8 +159,20 @@ assert 8 'int main() { int x[3][4]; return sizeof(**x + 1); }'
 assert 8 'int main() { int x=1; return sizeof(x=2); }'
 assert 1 'int main() { int x=1; sizeof(x=2); return x; }'
 
+assert 0 'int x; int main() { return x; }'
+assert 3 'int x; int main() { x=3; return x; }'
+assert 7 'int x; int y; int main() { x=3; y=4; return x+y; }'
+assert 7 'int x, y; int main() { x=3; y=4; return x+y; }'
+assert 0 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[0]; }'
+assert 1 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[1]; }'
+assert 2 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[2]; }'
+assert 3 'int x[4]; int main() { x[0]=0; x[1]=1; x[2]=2; x[3]=3; return x[3]; }'
+
+assert 8 'int x; int main() { return sizeof(x); }'
+assert 32 'int x[4]; int main() { return sizeof(x); }'
+
 # note that both variables out of block scope and matching the variable signature are not checked for in chinnacc currently. However, function scope is still being respected
 
-echo "Tests passed: $test_passed/104"
+echo "Tests passed: $test_passed/114"
 
 echo OK

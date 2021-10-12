@@ -80,6 +80,12 @@ static Obj *find_var(Token *tok) {
 			return var;
 		}
 	}
+
+	for(Obj *var = globals; var; var = var->next) {
+		if (strlen(var->name) == tok->len && !strncmp(var->name, tok->loc, tok->len)) {
+			return var;
+		}
+	}
 	return NULL;
 }
 
@@ -448,6 +454,19 @@ static Node *stmt(Token **tok_loc) {
 	return expr_stmt(tok_loc);
 }
 
+// expr-stmt -> expr? ";"
+static Node *expr_stmt(Token **tok_loc) {
+	Token *tok = *tok_loc;
+	if (equal(tok, ";")) {
+		*tok_loc = tok->next;
+		return new_node(ND_BLOCK, tok); // treat as empty block, compiler currently does not gen code for empty blocks
+	}
+	Node *node = new_node(ND_EXPR_STMT, tok);
+	node->lhs = expr(tok_loc);
+	*tok_loc = skip(*tok_loc, ";");
+	return node;
+}
+
 // compound-stmt -> (declaration | stmt)* "}"
 static Node *compound_stmt(Token **tok_loc) {
 	Node head = {};
@@ -585,17 +604,31 @@ static void *function(Token **tok_loc, Type *basety) {
 	fn->stack_size = 0;
 }
 
-// expr-stmt -> expr? ";"
-static Node *expr_stmt(Token **tok_loc) {
-	Token *tok = *tok_loc;
-	if (equal(tok, ";")) {
-		*tok_loc = tok->next;
-		return new_node(ND_BLOCK, tok); // treat as empty block, compiler currently does not gen code for empty blocks
+// note that similar to local decl, there could be multiple vars in same line
+// otherwise similar to function def parsing
+static void *global_variable(Token **tok_loc, Type *basety) {
+	bool first = true;
+
+	while (!consume(tok_loc, ";")) {
+		if (!first)
+			*tok_loc = skip(*tok_loc, ",");
+		first = false;
+
+		Type *ty = declarator(tok_loc, basety);
+		new_gvar(get_ident(ty->name), ty);
 	}
-	Node *node = new_node(ND_EXPR_STMT, tok);
-	node->lhs = expr(tok_loc);
-	*tok_loc = skip(*tok_loc, ";");
-	return node;
+}
+
+// just a convenience function to look ahead and determine if its a func def or global var def
+// this is so the parsing functions for these two cases are simpler
+static bool is_function(Token *tok) {
+	if (equal(tok, ";"))
+		return false;
+	Type dummy_basety = {};
+	// this call to declarator will only advance the tok_ptr for the local version of
+	// tok
+	Type *ty = declarator(&tok, &dummy_basety);
+	return ty->kind == TY_FN;
 }
 
 // top level parsing translation scheme, equivalent to the following
@@ -604,7 +637,13 @@ Obj *parse(Token *tok) {
 	globals = NULL;
 	while (tok->kind != TK_EOF) {
 		Type *basety = declspec(&tok);
-		function(&tok, basety);
+
+		if (is_function(tok)) {
+			function(&tok, basety);
+			continue;
+		}
+
+		global_variable(&tok, basety);
 	}
 	return globals;
 }
