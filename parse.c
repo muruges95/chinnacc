@@ -68,13 +68,7 @@ static Obj *new_gvar(char *name, Type *ty) {
 // create a unique name for objects create for literals
 static char *gen_unique_name() {
 	static int curr_id = 0;
-	char *buf = calloc(1, 20); // 4 char for the leading, 15 for the remaining
-	// 2**10 is slightly more than 10**3. Ints are either 2 or 4 bytes wide (need to verify) so max size is
-	// roughly 2**32, which is roughly 10 digits, so no issue of overflow unless the size of ints change
-	// in the future, though it would still be extremely difficult to trigger this condition (need to have
-	// more than a quadrillion variables (10**15++))...
-	sprintf(buf, ".L..%d", curr_id++);
-	return buf; 
+	return format(".L..%d", curr_id++);
 }
 
 // anonymous version of new_gvar for creating literals that require

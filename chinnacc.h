@@ -173,6 +173,10 @@ bool equal(Token *tok, char *fmt);
 Token *skip(Token *tok, char *s);
 bool consume(Token **tok_loc, char *str);
 
+// In strings file
+
+char *format(char *fmt, ...);
+
 /** ERROR REPORTING **/
 
 void error(char *fmt, ...);
