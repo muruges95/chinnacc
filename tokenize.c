@@ -110,17 +110,61 @@ static bool is_keyword(Token *tok) {
 	return false;
 }
 
-static Token *read_string_literal(char *start) {
-	char *p = start + 1;
+// read escape char and return the char it is supposed to represent, meant to be used after reading
+// in a leading backslash char
+static int read_escaped_char(char *p) {
+	// we choose to define the meaning of each escaped char using our original compiler's definition
+	// apparently this helps with correctness and security of generated code
+	// TODO: read this: https://github.com/rui314/chibicc/wiki/thompson1984.pdf
+
+	switch (*p) {
+	case 'a': return '\a';
+	case 'b': return '\b';
+	case 't': return '\t';
+	case 'n': return '\n';
+	case 'v': return '\v';
+	case 'f': return '\f';
+	case 'r': return '\r';
+	case 'e': return 27; //  this is a GNU C extension for the ASCII escape char
+	default: return *p;
+	}
+}
+
+static char *find_string_literal_end(char *p) {
+	char *start = p - 1;
 	// terminate once we reach the closing double quotation char
 	for (; *p != '"'; p++) {
 		// single line string literals cannot contain these two chars
 		if (*p == '\n' || *p == '\0') 
 			error_at(start, "unclosed string literal");
+		// we skip due to possibility of string literal containing an escaped closing quotation char
+		if (*p == '\\')
+			p++;
 	}
-	Token *tok = new_token(TK_STR, start, p + 1);
-	tok->ty = arr_of(ty_char, p - start); // we need to factor in the null char at the end
-	tok->str = strndup(start + 1, p - start - 1); // dont need to factor in as fn null terms it
+	return p; // return the ponter to the end of the string literal
+}
+
+// we will have to manually read in the characters char by char instead of using strndup
+// so as to properly handle escaped chars
+static Token *read_string_literal(char *start) {
+	char *end = find_string_literal_end(start + 1);
+
+	char *buf = calloc(1, end - start); // it might be more than we need but not a big issue (1 extra for each escape char)
+	int len = 0; // to determine the true len of the string
+
+	for (char *p = start + 1; p < end;) {
+		// start of escaped character
+		if (*p == '\\') {
+			buf[len++] = read_escaped_char(p + 1); // we only increase len by 1
+			p += 2; // skip backslash and escaped char
+		} else {
+			buf[len++] = *p++;
+		}
+	}
+
+	Token *tok = new_token(TK_STR, start, end + 1); // factor in closing quotes
+	tok->ty = arr_of(ty_char, len + 1); // we need to factor in the null char at the end
+	tok->str = buf;
 	return tok;
 }
 
