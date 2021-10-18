@@ -86,6 +86,15 @@ static bool startswith(char *p, char *q) {
 	return strncmp(p, q, strlen(q)) == 0;
 }
 
+// assumes it is a valid hex char from 0-9[a-f|A-F]
+static int from_hex_char(char c) {
+	if ('0' <= c && c <= '9') // is numeric
+		return c - '0';
+	if ('a' <= c && c <= 'f')
+		return c - 'a' + 10;
+	return c - 'A' + 10;
+}
+
 // returns the length of the punct to consume
 // if one of the equality operators returns 2, otherwise 1 if a punct
 static int read_punct(char *p) {
@@ -112,7 +121,35 @@ static bool is_keyword(Token *tok) {
 
 // read escape char and return the char it is supposed to represent, meant to be used after reading
 // in a leading backslash char
-static int read_escaped_char(char *p) {
+static int read_escaped_char(char **char_pos, char *p) {
+	// if octal escape sequence, 1-3 octal numbers
+	if ('0' <= *p && *p <= '7') {
+		int octal_num = *p++ - '0';
+		if ('0' <= *p && *p <= '7') {
+			octal_num = (octal_num << 3) + (*p++ - '0');
+			if ('0' <= *p && *p <= '7')
+				octal_num = (octal_num << 3) + (*p++ - '0');
+		}
+		*char_pos = p;
+		return octal_num;
+	}
+
+	// if its a hex sequence
+	if (*p == 'x') {
+		p++;
+		if (!isxdigit(*p))
+			error_at(p, "invalid hex escape sequence");
+		int hex_num = 0;
+		while (isxdigit(*p))
+			hex_num = (hex_num << 4) + (from_hex_char(*p++));
+		*char_pos = p;
+		return hex_num;
+	}
+
+
+	// we will be just skipping a single char for the remaining case(s)
+	*char_pos = p + 1;
+
 	// we choose to define the meaning of each escaped char using our original compiler's definition
 	// apparently this helps with correctness and security of generated code
 	// TODO: read this: https://github.com/rui314/chibicc/wiki/thompson1984.pdf
@@ -154,12 +191,10 @@ static Token *read_string_literal(char *start) {
 
 	for (char *p = start + 1; p < end;) {
 		// start of escaped character
-		if (*p == '\\') {
-			buf[len++] = read_escaped_char(p + 1); // we only increase len by 1
-			p += 2; // skip backslash and escaped char
-		} else {
+		if (*p == '\\')
+			buf[len++] = read_escaped_char(&p, p + 1); // we only increase len by 1
+		else
 			buf[len++] = *p++;
-		}
 	}
 
 	Token *tok = new_token(TK_STR, start, end + 1); // factor in closing quotes

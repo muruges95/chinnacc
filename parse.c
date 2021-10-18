@@ -1,5 +1,4 @@
 #include "chinnacc.h"
-#include <stdio.h>
 
 // All local variable instances created during parsing are stored in a linked list
 static Obj *locals; // stack DS

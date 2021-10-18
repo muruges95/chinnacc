@@ -1,6 +1,4 @@
 #include "chinnacc.h"
-#include <stdarg.h>
-#include <stdio.h>
 
 // Takes in a printf style fmt string and variable args
 // and returns the formatted string. The memstream fn opens a
