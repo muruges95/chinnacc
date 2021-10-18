@@ -9,7 +9,7 @@
 char *format(char *fmt, ...) {
     char *buf;
     size_t buflen;
-    FILE *out = open_memstream(&buf, &buflen);
+    FILE *out = open_memstream(&buf, &buflen); // open memstream is a posix function that requires the header we added in our main header file for strndup
 
     va_list ap;
     va_start(ap, fmt);
