@@ -1,4 +1,6 @@
 #include "chinnacc.h"
+#include <stdarg.h>
+#include <stdio.h>
 
 static int depth = 0; // stack depth
 // conventional registers used for first 6 args of function in a fn call, in the correct order
@@ -9,6 +11,15 @@ static Obj *current_fn; // stacktracee of fns to know where to jmp to
 static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
 
+// similar to the java function, appends a newline to the format string
+static void println(char *fmt_string, ...) {
+	va_list ap;
+	va_start(ap, fmt_string);
+	vprintf(fmt_string, ap);
+	printf("\n");
+	va_end(ap);
+}
+
 // for generating sections to jump to
 static int count(void) {
 	static int i = 1;
@@ -16,12 +27,12 @@ static int count(void) {
 }
 
 static void push(void) {
-	printf("  push %%rax\n");
+	println("  push %%rax");
 	depth++;
 }
 
 static void pop(char *arg) {
-	printf("  pop %s\n", arg);
+	println("  pop %s", arg);
 	depth--;
 }
 
@@ -38,10 +49,10 @@ static void gen_addr_and_load(Node *node) {
 	case ND_VAR:
 		if (node->var->is_local) {
 			// local var
-			printf("  lea %d(%%rbp), %%rax\n", node->var->offset);
+			println("  lea %d(%%rbp), %%rax", node->var->offset);
 		} else {
 			// global var
-			printf("  lea %s(%%rip), %%rax\n", node->var->name);
+			println("  lea %s(%%rip), %%rax", node->var->name);
 		}
 		return;
 	case ND_DEREF:
@@ -60,29 +71,29 @@ static void load(Type *ty) {
 		return; // do nothing as address is already in rax
 	
 	if (ty->size == 1) // char type
-		printf("  movsbq (%%rax), %%rax\n");
+		println("  movsbq (%%rax), %%rax");
 	else
-		printf("  mov (%%rax), %%rax\n");
+		println("  mov (%%rax), %%rax");
 }
 
 // type of store function dependent on type
 static void store(Type *ty) {
 	pop("%rdi\n"); // store top of stack into temp reg
 	if (ty->size == 1)
-		printf("  mov %%al, (%%rdi)\n");
+		println("  mov %%al, (%%rdi)");
 	else
-		printf("  mov %%rax, (%%rdi)\n"); // store val from reg into addr held in temp reg
+		println("  mov %%rax, (%%rdi)"); // store val from reg into addr held in temp reg
 }
 
 // Gen code for an expression node
 static void gen_expr(Node *node) {
 	switch (node->kind) {
 	case ND_NUM:
-		printf("  mov $%d, %%rax\n", node->val);
+		println("  mov $%d, %%rax", node->val);
 		return;
 	case ND_NEG:
 		gen_expr(node->lhs);
-		printf("  neg %%rax\n");
+		println("  neg %%rax");
 		return;
 	case ND_VAR:
 		gen_addr_and_load(node);
@@ -114,7 +125,7 @@ static void gen_expr(Node *node) {
 			pop(argregs64[i]); // find out if this is always the case or can pop out to lsb's only
 
 		// printf("  mov $0, %%rax\n"); // NOTE: find out reason for this line
-		printf("  call %s\n", node->fnname); // note requires fn to be defined somewhere
+		println("  call %s", node->fnname); // note requires fn to be defined somewhere
 		return;
 	}
 	case ND_STMT_EXPR:
@@ -134,34 +145,34 @@ static void gen_expr(Node *node) {
 
 	switch (node->kind) {
 	case ND_ADD:
-		printf("  add %%rdi, %%rax\n"); // dest is rax
+		println("  add %%rdi, %%rax"); // dest is rax
 		return;
 	case ND_SUB:
-		printf("  sub %%rdi, %%rax\n"); // sub source (rdi) from dest (rax)
+		println("  sub %%rdi, %%rax"); // sub source (rdi) from dest (rax)
 		return;
 	case ND_MUL:
-		printf("  imul %%rdi, %%rax\n"); // dest is rax
+		println("  imul %%rdi, %%rax"); // dest is rax
 		return;
 	case ND_DIV:
-		printf("  cqo\n"); // converts quadword in rax to octoword rdx:rax
-		printf("  idiv %%rdi\n"); // signed divide the octoword by rdi
+		println("  cqo"); // converts quadword in rax to octoword rdx:rax
+		println("  idiv %%rdi"); // signed divide the octoword by rdi
 		return;
 	case ND_EQ:
 	case ND_NE:
 	case ND_LT:
 	case ND_LTE:
-		printf("  cmp %%rdi, %%rax\n"); // sets flag code based on  $rax - $rdi (essentially cmp op2 op1 does comparison of op1 and op2 in that order)
+		println("  cmp %%rdi, %%rax"); // sets flag code based on  $rax - $rdi (essentially cmp op2 op1 does comparison of op1 and op2 in that order)
 		// $al is the least signficant byte of the ax register, set val accordingly
 		if (node->kind == ND_EQ)
-			printf("  sete %%al\n");
+			println("  sete %%al");
 		else if (node->kind == ND_NE)
-			printf("  setne %%al\n");
+			println("  setne %%al");
 		else if (node->kind == ND_LT)
-			printf("  setl %%al\n"); // sets al to 1 if rax > rdi
+			println("  setl %%al"); // sets al to 1 if rax > rdi
 		else
-			printf("  setle %%al\n"); // sets al to 1 if rax >= rdi
+			println("  setle %%al"); // sets al to 1 if rax >= rdi
 
-		printf("  movzb %%al, %%rax\n");	
+		println("  movzb %%al, %%rax");	
 		return;
 	// exact same handling as block as final expression statement places expression eval result into rax
 	// which is what we expect from an expr eval
@@ -176,15 +187,15 @@ static void gen_stmt(Node *node) {
 	case ND_IF: { // blocks are used so c var wont intefere in other cases
 		int c = count();
 		gen_expr(node->cond);
-		printf("  cmp $0, %%rax\n");
-		printf("  je .L.else.%d\n", c); // append id to section to make it unique
+		println("  cmp $0, %%rax");
+		println("  je .L.else.%d", c); // append id to section to make it unique
 		gen_stmt(node->then);
-		printf("  jmp .L.end.%d\n", c);
-		printf(".L.else.%d:\n", c);
+		println("  jmp .L.end.%d", c);
+		println(".L.else.%d:", c);
 		if (node->els) {
 			gen_stmt(node->els);
 		}
-		printf(".L.end.%d:\n", c);
+		println(".L.end.%d:", c);
 		return;
 	}
 	case ND_FOR: {
@@ -192,27 +203,27 @@ static void gen_stmt(Node *node) {
 		if (node->init) {
 			gen_stmt(node->init);
 		}
-		printf(".L.begin.%d:\n", c);
+		println(".L.begin.%d:", c);
 		if (node->cond) {
 			gen_expr(node->cond);
-			printf("  cmp $0, %%rax\n");
-			printf("  je .L.end.%d\n", c);
+			println("  cmp $0, %%rax");
+			println("  je .L.end.%d", c);
 		}
 		gen_stmt(node->then);
 		if (node->inc) {
 			gen_expr(node->inc);
 		}
-		printf("  jmp .L.begin.%d\n", c);
-		printf(".L.end.%d:\n", c);
+		println("  jmp .L.begin.%d", c);
+		println(".L.end.%d:", c);
 		return;
 	}
 	case ND_DOWHILE: {
 		int c = count();
-		printf(".L.dowhile.%d:\n", c);
+		println(".L.dowhile.%d:", c);
 		gen_stmt(node->then);
 		gen_expr(node->cond);
-		printf("  cmp $0, %%rax\n");
-		printf("  jne .L.dowhile.%d\n", c);
+		println("  cmp $0, %%rax");
+		println("  jne .L.dowhile.%d", c);
 		return;
 	}
 	case ND_BLOCK:
@@ -222,7 +233,7 @@ static void gen_stmt(Node *node) {
 		return;
 	case ND_RETURN:
 		gen_expr(node->lhs);
-		printf("  jmp .L.return.%s\n", current_fn->name);
+		println("  jmp .L.return.%s", current_fn->name);
 		return;
 	case ND_EXPR_STMT:
 		gen_expr(node->lhs);
@@ -254,16 +265,16 @@ static void emit_data(Obj *prog) {
 	for (Obj *var = prog; var; var = var->next) {
 		if (var->is_function)
 			continue;
-		printf("  .data\n");
-		printf("  .globl %s\n", var->name);
-		printf("%s:\n", var->name);
+		println("  .data");
+		println("  .globl %s", var->name);
+		println("%s:", var->name);
 
 		// one of those anonymous global vars used for string literals
 		if (var->init_data) {
 			for (int i = 0; i < var->ty->size; i++)
-				printf("  .byte %d\n", var->init_data[i]); // print char by char in numerical fmt
+				println("  .byte %d", var->init_data[i]); // print char by char in numerical fmt
 		} else
-			printf("  .zero %d\n", var->ty->size);
+			println("  .zero %d", var->ty->size);
 	}
 }
 
@@ -272,20 +283,20 @@ static void emit_text(Obj *prog) {
 	for (Obj *fn = prog; fn; fn = fn->next) {
 		if (!fn->is_function)
 			continue;
-		printf("  .globl %s\n", fn->name);
-		printf("  .text\n");
-		printf("%s:\n", fn->name);
+		println("  .globl %s", fn->name);
+		println("  .text");
+		println("%s:", fn->name);
 		current_fn = fn;
 		// Prologue
-		printf("  push %%rbp\n"); // save base pointer
-		printf("  mov %%rsp, %%rbp\n"); // set base pointer to stack ptr
-		printf("  sub $%d, %%rsp\n", fn->stack_size); // allocate space for variables
+		println("  push %%rbp"); // save base pointer
+		println("  mov %%rsp, %%rbp"); // set base pointer to stack ptr
+		println("  sub $%d, %%rsp", fn->stack_size); // allocate space for variables
 		int i = 0;
 		for (Obj *var = fn->params; var; var = var->next) {
 			if (var->ty->size == 1)
-				printf("  mov %s, %d(%%rbp)\n", argregs8[i++], var->offset);
+				println("  mov %s, %d(%%rbp)", argregs8[i++], var->offset);
 			else
-				printf("  mov %s, %d(%%rbp)\n", argregs64[i++], var->offset);
+				println("  mov %s, %d(%%rbp)", argregs64[i++], var->offset);
 		}
 
 		// emit code for each function
@@ -293,10 +304,10 @@ static void emit_text(Obj *prog) {
 		assert(depth == 0);
 
 		// epilogue
-		printf(".L.return.%s:\n", fn->name); // provide section to jump to for return stmts
-		printf("  mov %%rbp, %%rsp\n");
-		printf("  pop %%rbp\n");
-		printf("  ret\n");
+		println(".L.return.%s:", fn->name); // provide section to jump to for return stmts
+		println("  mov %%rbp, %%rsp");
+		println("  pop %%rbp");
+		println("  ret");
 	}
 
 }
