@@ -1,7 +1,13 @@
 #include "chinnacc.h"
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
 
-// Input string
+// Start of input string
 static char *current_input;
+
+// input filename
+static char *current_filename;
 
 // Reports an error and exit prog
 // Takes in a var num of error params
@@ -13,9 +19,38 @@ void error(char *fmt, ...) {
 	exit(1);
 }
 
+// Reports an error message in the following format and exit.
+// e.g.
+// foo.c:10 x = y + 1;
+//              ^ <error message here>
 static void verror_at(char *loc, char *fmt, va_list ap) {
-	int pos = loc - current_input;
-	fprintf(stderr, "%s\n", current_input);
+	// int pos = loc - current_input;
+	// fprintf(stderr, "%s\n", current_input);
+
+	// first we need to find the start of the line containing the loc
+	char *line = loc;
+	// first condition is in case we are on the first line
+	while (current_input < line && line[-1] != '\n')
+		line--; // keep going backwards till hitting start of input or newline char
+	
+	char *end = loc;
+	while (*end != '\n')
+		end++; // go to newline char at end of line. TODO: what happens if error on last line
+		// without terminating new line char? -> we make sure there is an ending \n when tokenizing file
+	
+	// determine the line number
+	int line_no = 1;
+	for (char *p = current_input; p < line; p++)
+		if (*p == '\n')
+			line_no++;
+	
+	// print out line 
+	int leading = fprintf(stderr, "%s:%d: ", current_filename, line_no); // returns number of chars written
+	fprintf(stderr, "%.*s\n", (int) (end - line), line); // TODO: find out how this format string works
+
+	// error message, taking into account indent needed for the leading part
+	int pos = loc - line + leading;
+
 	fprintf(stderr, "%*s^ ", pos, ""); // prepends sufficient spaces so that the caret sign is pointing up at the correct char
 	vfprintf(stderr, fmt, ap);
 	fprintf(stderr, "\n");
@@ -214,8 +249,9 @@ static void convert_keywords(Token *tok) {
 
 // Tokenize the input string and returns the new tokens
 // current input is a global pointer for error reporting purposes
-Token *tokenize(char *p) {
+static Token *tokenize(char *filename, char *p) {
 	current_input = p;
+	current_filename = filename;
 	Token head = {};
 	Token *curr = &head;
 
@@ -269,3 +305,45 @@ Token *tokenize(char *p) {
     return head.next;
 }
 
+// Read contents of file into a char buff. Can currently read up in 4096 characters per batch
+static char *read_file(char *path) {
+	FILE *fp;
+
+	// read from stdin if filename is "-"
+	if (strcmp(path, "-") == 0) {
+		fp = stdin;
+	} else {
+		fp = fopen(path, "r");
+		if (!fp)
+			error("cannot open %s: %s", path, strerror(errno));
+	}
+
+	char *buf;
+	size_t buflen;
+	FILE *out = open_memstream(&buf, &buflen); // store file in memory
+
+	for (;;) {
+		char tmp_buf[4096];
+		int n = fread(tmp_buf, 1, sizeof(tmp_buf), fp);
+		if (n == 0) // no more bytes left to read
+			break;
+		fwrite(tmp_buf, 1, n, out);
+	}
+
+	if (fp != stdin)
+		fclose(fp);
+	
+	fflush(out); // forces any unwritten bytes from the tmp buf to be written before continuing
+	// if its an empty file or does not terminate with a newline
+	if (buflen == 0 || buf[buflen - 1] != '\n')
+		fputc('\n', out);
+	// ensure that after the newline char is trailed by null char.
+	// this is because the main tokenization function runs till hitting a null character
+	fputc('\0', out);
+	fclose(out);
+	return buf;
+}
+
+Token *tokenize_file(char *path) {
+	return tokenize(path, read_file(path));
+}

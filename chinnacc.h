@@ -6,6 +6,7 @@
 #include <string.h> // contains utility functions for manipulating strings
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 typedef struct Type Type;
 
@@ -34,7 +35,7 @@ struct Token {
 	char *str;		// string value
 };
 
-Token *tokenize(char *p);
+Token *tokenize_file(char *filename);
 
 /** PARSE **/
 typedef enum {
