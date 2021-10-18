@@ -215,8 +215,14 @@ assert 119 'int main() { return "\x77"[0]; }'
 assert 165 'int main() { return "\xA5"[0]; }'
 assert 255 'int main() { return "\x00ff"[0]; }'
 
+assert 0 'int main() { return ({ 0; }); }'
+assert 2 'int main() { return ({ 0; 1; 2; }); }'
+assert 1 'int main() { ({ 0; return 1; 2; }); return 3; }'
+assert 6 'int main() { return ({ 1; }) + ({ 2; }) + ({ 3; }); }'
+assert 3 'int main() { return ({ int x=3; x; }); }'
+
 # note that both variables out of block scope and matching the variable signature are not checked for in chinnacc currently. However, function scope is still being respected
 
-echo "Tests passed: $test_passed/150"
+echo "Tests passed: $test_passed/155"
 
 echo OK

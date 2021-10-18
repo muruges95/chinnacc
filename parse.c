@@ -153,9 +153,18 @@ static Node *fncall(Token **tok_loc) {
 
 // primary: the units that are unbreakable, start with this,
 // will also include the non-terminal involved in the lowest precedence ops
-// Translation scheme: primary -> "(" expr ")" | ident fn-args? | str | num
+// Translation scheme: primary -> "(" "{" compound-stmt ")" | "(" expr ")" | ident fn-args? | str | num
 // Note that fncall handling is done separately
 static Node *primary(Token **tok_loc) {
+	// stmt expression
+	if (equal(*tok_loc, "(") && equal((*tok_loc)->next, "{")) {
+		Node *node = new_node(ND_STMT_EXPR, *tok_loc);
+		*tok_loc = (*tok_loc)->next->next;
+		node->body = compound_stmt(tok_loc)->body;
+		*tok_loc = skip(*tok_loc, ")");
+		return node;
+	}
+
 	if (consume(tok_loc, "(")) {
 		Node *node = expr(tok_loc);
 		*tok_loc = skip(*tok_loc, ")");
@@ -501,14 +510,13 @@ static Node *compound_stmt(Token **tok_loc) {
 	Node head = {};
 	Node *body_node = &head;
 	Node *node = new_node(ND_BLOCK, *tok_loc);
-	while (!equal(*tok_loc, "}")) {
+	while (!consume(tok_loc, "}")) {
 		if (is_typename(*tok_loc))
 			body_node = body_node->next = declaration(tok_loc);
 		else
 			body_node = body_node->next = stmt(tok_loc);
 		add_type(body_node);
 	}
-	*tok_loc = (*tok_loc)->next;
 	node->body = head.next;
 	return node;
 }

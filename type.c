@@ -60,44 +60,60 @@ void add_type(Node *node) {
 		add_type(n);
 
 	switch (node->kind) {
-		case ND_ADD:
-		case ND_SUB:
-		case ND_MUL:
-		case ND_DIV:
-		case ND_NEG:
-			// for these cases infer type based on child nodes
-			node->ty = node->lhs->ty;
-			return;
-		case ND_ASSIGN:
-			if (node->lhs->ty->kind == TY_ARR)
-				error_tok(node->lhs->tok, "not an lval");
-			node->ty = node->lhs->ty;
-			return;
-		case ND_EQ:
-		case ND_NE:
-		case ND_LT:
-		case ND_LTE:
-		case ND_NUM:
-		case ND_FNCALL:
-			node->ty = ty_int; // use a constant where we can to save space
-			return;
-		case ND_VAR:
-			node->ty = node->var->ty;
-			return;
-		case ND_ADDR:
-			if (node->lhs->ty->kind == TY_ARR)
-				// In this case a array var is an alias of its address (simply put)
-				// thats why it has the same type as a pointer of the base type of the
-				// arr instead of a double ptr
-				node->ty = pointer_to(node->lhs->ty->base);
-			else
-				node->ty = pointer_to(node->lhs->ty);
-			return;
-		case ND_DEREF:
-			if (!node->lhs->ty->base) // not ptr nor arr
-				error_tok(node->tok, "invalid pointer dereference");
-			node->ty = node->lhs->ty->base;
-			return;
+	case ND_ADD:
+	case ND_SUB:
+	case ND_MUL:
+	case ND_DIV:
+	case ND_NEG:
+		// for these cases infer type based on child nodes
+		node->ty = node->lhs->ty;
+		return;
+	case ND_ASSIGN:
+		if (node->lhs->ty->kind == TY_ARR)
+			error_tok(node->lhs->tok, "not an lval");
+		node->ty = node->lhs->ty;
+		return;
+	case ND_EQ:
+	case ND_NE:
+	case ND_LT:
+	case ND_LTE:
+	case ND_NUM:
+	case ND_FNCALL:
+		node->ty = ty_int; // use a constant where we can to save space
+		return;
+	case ND_VAR:
+		node->ty = node->var->ty;
+		return;
+	case ND_ADDR:
+		if (node->lhs->ty->kind == TY_ARR)
+			// In this case a array var is an alias of its address (simply put)
+			// thats why it has the same type as a pointer of the base type of the
+			// arr instead of a double ptr
+			node->ty = pointer_to(node->lhs->ty->base);
+		else
+			node->ty = pointer_to(node->lhs->ty);
+		return;
+	case ND_DEREF:
+		if (!node->lhs->ty->base) // not ptr nor arr
+			error_tok(node->tok, "invalid pointer dereference");
+		node->ty = node->lhs->ty->base;
+		return;
+	case ND_STMT_EXPR:
+		// special handling from block as if the last stmt is a expr stmt, the stmt expr gets its type and return val from it
+		if (node->body) {
+			Node *stmt = node->body;
+			// iterate through body to the last node
+			while (stmt->next)
+				stmt = stmt->next;
+			if (stmt->kind == ND_EXPR_STMT) {
+				node->ty = stmt->lhs->ty;
+				return;
+			}
+		}
+		error_tok(node->tok, "statement expression returning void is not supported");
+		return;
+	default:
+		return;
 	}
 }
 

@@ -58,7 +58,8 @@ typedef enum {
 	ND_FOR,			// for or while stmt
 	ND_DOWHILE,		// do-while
 	ND_RETURN,		// return expr;
-	ND_EXPR_STMT	// expr;
+	ND_EXPR_STMT,	// expr;
+	ND_STMT_EXPR	// (block)  , used where an expr is expected
 } NodeKind;
 
 // Variables and Functions
@@ -111,7 +112,7 @@ struct Node {
 	Node *init;
 	Node *inc;
 
-	// Linked list of nodes for blocks
+	// Linked list of nodes for blocks and stmt expressions
 	Node *body;
 
 	// For Function calls
