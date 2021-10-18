@@ -256,6 +256,24 @@ static Token *tokenize(char *filename, char *p) {
 	Token *curr = &head;
 
     while (*p) {
+		// skip line comments
+		if (startswith(p, "//")) {
+			p += 2;
+			// ignore while no newline encountered
+			while (*p != '\n')
+				p++;
+			continue;
+		}
+
+		// skip block comments
+		if (startswith(p, "/*")) {
+			char *q = strstr(p + 2, "*/"); // finds ptr to first occurence of substr in string
+			if (!q)
+				error_at(p, "unclosed block comment");
+			p = q + 2;
+			continue;
+		}
+
 		// Skip whitespace chars
 		if (isspace(*p)) {
 			p++;
