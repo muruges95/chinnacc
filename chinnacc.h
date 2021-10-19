@@ -171,7 +171,7 @@ void codegen(Obj *prog);
 
 /** UTILITY FNS **/
 
-bool equal(Token *tok, char *fmt);
+bool equal(Token *tok, char *s);
 Token *skip(Token *tok, char *s);
 bool consume(Token **tok_loc, char *str);
 

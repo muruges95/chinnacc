@@ -71,10 +71,10 @@ void error_tok(Token *tok, char *fmt, ...) {
 
 /* HELPER FUNCTIONS */
 
-// Compares current token string to op
-bool equal(Token *tok, char *op) {
-	return memcmp(tok->loc, op, tok->len) == 0
-		&& op[tok->len] == '\0'; //check if null terminated string
+// Compares current token string to s
+bool equal(Token *tok, char *s) {
+	return memcmp(tok->loc, s, tok->len) == 0
+		&& s[tok->len] == '\0'; //check if null terminated string
 }
 
 // Asserts that current token matches the char `s`.

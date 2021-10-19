@@ -1,6 +1,38 @@
 #include "chinnacc.h"
+#include <stdlib.h>
+
+// an additional DS to wrap around vars, as we are already using var->next to access all locals/globals
+// when iterating through them. It could be possible that we make use of just scopes to then derive locals/globals,
+// instead of having 'locals' and 'globals', but they provide a convenience, especially in code gen phase
+// we also additionally choose to store the name in this DS for simpler variable lookup.
+typedef struct VarScope VarScope;
+struct VarScope {
+	Obj *var;
+	VarScope *next;
+	char *name;
+};
+
+// DS for storing all the variables within a scope and any sub scopes
+typedef struct Scope Scope;
+struct Scope {
+	Scope *next; // next immediate outer scope
+	VarScope *var; // linked list of variables in scope
+};
+
+Scope *current_scope = &(Scope){};
+
+static void enter_scope() {
+	Scope *sc = calloc(1, sizeof(Scope));
+	sc->next = current_scope;
+	current_scope = sc;
+}
+
+static void exit_scope() {
+	current_scope = current_scope->next;
+}
 
 // All local variable instances created during parsing are stored in a linked list
+// used more for codegen phase rather than var lookup in the parsing phase
 static Obj *locals; // stack DS
 static Obj *globals; // all global vars and functions
 
@@ -38,11 +70,20 @@ static Node *new_var_node(Obj *var, Token *tok) {
 	return node;
 }
 
+static void push_into_scope(Obj *var, char *name) {
+	VarScope *vs = calloc(1, sizeof(VarScope));
+	vs->name = name;
+	vs->var = var;
+	vs->next = current_scope->var;
+	current_scope->var = vs;
+}
+
 // creates an object for variables / functions
 static Obj *new_var(char *name, Type *ty) {
 	Obj *var = calloc(1, sizeof(Obj));
 	var->name = name;
 	var->ty = ty;
+	push_into_scope(var, name);
 	return var;
 }
 
@@ -91,19 +132,11 @@ static char *get_ident(Token *tok) {
 	return strndup(tok->loc, tok->len);
 }
 
-// find a local var by name from the linked list
 static Obj *find_var(Token *tok) {
-	for (Obj *var = locals; var; var = var->next) {
-		if (strlen(var->name) == tok->len && !strncmp(var->name, tok->loc, tok->len)) {
-			return var;
-		}
-	}
-
-	for(Obj *var = globals; var; var = var->next) {
-		if (strlen(var->name) == tok->len && !strncmp(var->name, tok->loc, tok->len)) {
-			return var;
-		}
-	}
+	for (Scope *scope = current_scope; scope; scope = scope->next)
+		for (VarScope *vs = scope->var; vs; vs = vs->next)
+			if (equal(tok, vs->name))
+				return vs->var;
 	return NULL;
 }
 
@@ -510,6 +543,8 @@ static Node *compound_stmt(Token **tok_loc) {
 	Node head = {};
 	Node *body_node = &head;
 	Node *node = new_node(ND_BLOCK, *tok_loc);
+
+	enter_scope();
 	while (!consume(tok_loc, "}")) {
 		if (is_typename(*tok_loc))
 			body_node = body_node->next = declaration(tok_loc);
@@ -517,6 +552,7 @@ static Node *compound_stmt(Token **tok_loc) {
 			body_node = body_node->next = stmt(tok_loc);
 		add_type(body_node);
 	}
+	exit_scope();
 	node->body = head.next;
 	return node;
 }
@@ -634,7 +670,7 @@ static void *function(Token **tok_loc, Type *basety) {
 	fn->is_function = true;
 
 	locals = NULL; // reset locals in function to null, and will be built up over succesive calls to append to the locals list
-
+	enter_scope();
 	create_param_lvars(ty->params);
 	fn->params = locals;
 	*tok_loc = skip(*tok_loc, "{");
@@ -642,6 +678,7 @@ static void *function(Token **tok_loc, Type *basety) {
 	fn->body = compound_stmt(tok_loc);
 	fn->locals = locals;
 	fn->stack_size = 0;
+	exit_scope();
 }
 
 // note that similar to local decl, there could be multiple vars in same line
@@ -672,7 +709,7 @@ static bool is_function(Token *tok) {
 }
 
 // top level parsing translation scheme, equivalent to the following
-// program = function-definition*
+// program = (function-definition|global-variable)*
 Obj *parse(Token *tok) {
 	globals = NULL;
 	while (tok->kind != TK_EOF) {

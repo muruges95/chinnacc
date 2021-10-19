@@ -229,9 +229,12 @@ assert 2 'int main() { /*
 this is a block comment
 */ return 2; }'
 
+assert 2 'int main() { int x=2; { int x=3; } return x; }'
+assert 2 'int main() { int x=2; { int x=3; } { int y=4; return x; }}'
+assert 3 'int main() { int x=2; { x=3; } return x; }'
 
 # note that both variables out of block scope and matching the variable signature are not checked for in chinnacc currently. However, function scope is still being respected
 
-echo "Tests passed: $test_passed/155"
+echo "Tests passed: $test_passed/161"
 
 echo OK
