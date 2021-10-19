@@ -167,7 +167,7 @@ Type *arr_of(Type *base, int size);
 void add_type(Node *node);
 
 /** CODEGEN **/
-void codegen(Obj *prog);
+void codegen(Obj *prog, FILE *out);
 
 /** UTILITY FNS **/
 

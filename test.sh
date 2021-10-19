@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 cat <<EOF | gcc -xc -c -o tmp2.o -
 int ret3() { return 3; }
@@ -16,7 +16,7 @@ assert() {
     expected="$1"
     input="$2"
 
-    echo "$input" | ./chinnacc - > tmp.s || exit
+    echo "$input" | ./chinnacc -o tmp.s - || exit
     gcc -static -o tmp tmp.s tmp2.o
     ./tmp
     actual="$?"

@@ -10,6 +10,7 @@ $(OBJS): chinnacc.h
 
 test: chinnacc
 	./test.sh
+	./test-driver.sh
 
 clean:
 	rm -f chinnacc *.o *~ tmp*

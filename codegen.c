@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+static FILE *output_file;
 static int depth = 0; // stack depth
 // conventional registers used for first 6 args of function in a fn call, in the correct order
 static char *argregs8[] = { "%dil", "%sil", "%dl", "%cl", "%r8b", "%r9b" };
@@ -12,11 +13,12 @@ static void gen_expr(Node *node);
 static void gen_stmt(Node *node);
 
 // similar to the java function, appends a newline to the format string
+// we also make use of this util function to write to the correct output stream
 static void println(char *fmt_string, ...) {
 	va_list ap;
 	va_start(ap, fmt_string);
-	vprintf(fmt_string, ap);
-	printf("\n");
+	vfprintf(output_file, fmt_string, ap);
+	fprintf(output_file, "\n");
 	va_end(ap);
 }
 
@@ -312,7 +314,8 @@ static void emit_text(Obj *prog) {
 
 }
 
-void codegen(Obj *prog) {
+void codegen(Obj *prog, FILE *out) {
+	output_file = out;
 	assign_lvar_offsets(prog);
 	emit_data(prog);
 	emit_text(prog);
